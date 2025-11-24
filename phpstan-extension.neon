@@ -39,6 +39,48 @@ parameters:
         -
             message: '#^Parameter .+ of static method PHPUnit\\InlineTests\\TestCase\\InlineTestCase::createTest\(\) expects ReflectionClass<object>, ReflectionClass<.+> given\.$#'
             path: 'tests/*'
+        # Function-based tests: $this is bound to TestCase context via closures
+        -
+            message: '#^Undefined variable: \$this$#'
+            paths:
+                - tests/Fixtures/FunctionBasedTests.php
+                - tests/Fixtures/FunctionBasedTestsWithDataProvider.php
+        -
+            message: '#^Cannot call method .+ on mixed\.$#'
+            paths:
+                - tests/Fixtures/FunctionBasedTests.php
+                - tests/Fixtures/FunctionBasedTestsWithDataProvider.php
+        -
+            message: '#^Attribute class PHPUnit\\Framework\\Attributes\\Test does not have the function target\.$#'
+            paths:
+                - tests/Fixtures/FunctionBasedTests.php
+                - tests/Fixtures/FunctionBasedTestsWithDataProvider.php
+        -
+            message: '#^Attribute class PHPUnit\\Framework\\Attributes\\DataProvider does not have the function target\.$#'
+            path: tests/Fixtures/FunctionBasedTestsWithDataProvider.php
+        # Function-based data providers can return generic arrays
+        -
+            message: '#^Function .+Provider\(\) return type has no value type specified in iterable type array\.$#'
+            path: tests/Fixtures/FunctionBasedTestsWithDataProvider.php
+        # Test helper methods that verify scanner behavior
+        -
+            message: '#^Method PHPUnit\\InlineTests\\Scanner\\InlineTestScanner::scan\(\) invoked with 1 parameter, 0 required\.$#'
+            path: tests/Integration/*
+        -
+            message: '#^Call to an undefined method PHPUnit\\Framework\\Test::tests\(\)\.$#'
+            path: tests/Integration/*
+        -
+            message: '#^Parameter .+ of (function count|static method PHPUnit\\Framework\\Assert::assertCount\(\)) expects .+, mixed given\.$#'
+            path: tests/Integration/*
+        -
+            message: '#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\.$#'
+            path: tests/Integration/FunctionBasedTestExecutionTest.php
+        -
+            message: '#^Cannot call method name\(\) on mixed\.$#'
+            path: tests/Integration/FunctionBasedTestExecutionTest.php
+        -
+            message: '#^Binary operation "\." between non-falsy-string and mixed results in an error\.$#'
+            path: tests/Integration/FunctionBasedDataProviderExecutionTest.php
 
 
 

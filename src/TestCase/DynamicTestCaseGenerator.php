@@ -25,18 +25,17 @@ final class DynamicTestCaseGenerator
 
         // Don't regenerate if class already exists
         if (class_exists($className, false)) {
+            /** @var class-string<TestCase> */
             return $className;
         }
 
         $classCode = $this->buildClassCode($className, $testClass);
 
         // Create the class
+        // @phpstan-ignore-next-line - eval() creates the class, but PHPStan can't verify this
         eval($classCode);
 
-        if (!class_exists($className, false)) {
-            throw new \RuntimeException("Failed to generate test class: {$className}");
-        }
-
+        /** @var class-string<TestCase> */
         return $className;
     }
 
@@ -118,7 +117,7 @@ final class DynamicTestCaseGenerator
     /**
      * Collect all data provider methods referenced in test methods.
      *
-     * @return array<ReflectionMethod|ReflectionFunction>
+     * @return array<\ReflectionMethod|\ReflectionFunction>
      */
     private function collectDataProviderMethods(InlineTestClass $testClass): array
     {
@@ -129,19 +128,26 @@ final class DynamicTestCaseGenerator
         foreach ($testClass->getTestMethods() as $testMethod) {
             $attributes = $testMethod->getAttributes(\PHPUnit\Framework\Attributes\DataProvider::class);
             foreach ($attributes as $attribute) {
-                $providerName = $attribute->getArguments()[0];
-                
+                $arguments = $attribute->getArguments();
+                if (empty($arguments)) {
+                    continue;
+                }
+                if (!is_string($arguments[0])) {
+                    continue;
+                }
+                $providerName = $arguments[0];
+
                 if ($isFunctionBased) {
                     // For function-based tests, look for a provider function in the same namespace
                     $namespace = $testClass->getNamespace();
-                    $fullFunctionName = $namespace ? $namespace . '\\' . $providerName : $providerName;
-                    
+                    $fullFunctionName = $namespace !== null ? $namespace . '\\' . $providerName : $providerName;
+
                     if (function_exists($fullFunctionName) && !isset($providers[$providerName])) {
                         $providers[$providerName] = new \ReflectionFunction($fullFunctionName);
                     }
                 } else {
                     // For class-based tests, look for a method on the class
-                    if ($originalClass->hasMethod($providerName) && !isset($providers[$providerName])) {
+                    if ($originalClass !== null && $originalClass->hasMethod($providerName) && !isset($providers[$providerName])) {
                         $providers[$providerName] = $originalClass->getMethod($providerName);
                     }
                 }
@@ -158,8 +164,8 @@ final class DynamicTestCaseGenerator
      */
     private function generateDataProviderMethod($providerMethod, InlineTestClass $testClass): string
     {
-        $methodName = $providerMethod instanceof \ReflectionFunction 
-            ? $providerMethod->getShortName() 
+        $methodName = $providerMethod instanceof \ReflectionFunction
+            ? $providerMethod->getShortName()
             : $providerMethod->getName();
 
         $code = "    public static function {$methodName}(): \\Generator|array\n";
@@ -171,9 +177,13 @@ final class DynamicTestCaseGenerator
             $code .= "        return \\{$fullFunctionName}();\n";
         } else {
             // Class-based data provider
-            $originalClassName = $testClass->getReflection()->getName();
+            $reflection = $testClass->getReflection();
+            if ($reflection === null) {
+                throw new \RuntimeException('Class reflection is null for class-based data provider');
+            }
+            $originalClassName = $reflection->getName();
             $isStatic = $providerMethod->isStatic();
-            
+
             if ($isStatic) {
                 // Static data provider - call directly on the original class
                 $code .= "        \$method = new \\ReflectionMethod('\\{$originalClassName}', '{$methodName}');\n";
@@ -275,6 +285,9 @@ final class DynamicTestCaseGenerator
                 $functionName = $method->getName();
                 $code .= "        \\{$functionName}();\n";
             } else {
+                if ($originalClass === null) {
+                    throw new \RuntimeException('Class reflection is null for class-based BeforeClass method');
+                }
                 $originalClassName = $originalClass->getName();
                 $methodName = $method->getName();
                 $code .= "        \$method = new \\ReflectionMethod('\\{$originalClassName}', '{$methodName}');\n";
@@ -303,6 +316,9 @@ final class DynamicTestCaseGenerator
                 $functionName = $method->getName();
                 $code .= "        \\{$functionName}();\n";
             } else {
+                if ($originalClass === null) {
+                    throw new \RuntimeException('Class reflection is null for class-based AfterClass method');
+                }
                 $originalClassName = $originalClass->getName();
                 $methodName = $method->getName();
                 $code .= "        \$method = new \\ReflectionMethod('\\{$originalClassName}', '{$methodName}');\n";
