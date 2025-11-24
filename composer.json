@@ -1,0 +1,60 @@
+{
+    "name": "phpunit/inline-tests",
+    "description": "PHPUnit extension for writing tests inline with application code using native #[Test] attributes",
+    "type": "library",
+    "license": "MIT",
+    "authors": [
+        {
+            "name": "Niklas",
+            "email": "author@example.com"
+        }
+    ],
+    "require": {
+        "php": "^8.2",
+        "phpunit/phpunit": "^11.0 || ^12.0"
+    },
+    "require-dev": {
+        "phpstan/phpstan": "^2.0",
+        "phpstan/extension-installer": "^1.4",
+        "friendsofphp/php-cs-fixer": "^3.64"
+    },
+    "autoload": {
+        "psr-4": {
+            "PHPUnit\\InlineTests\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "PHPUnit\\InlineTests\\Tests\\": "tests/"
+        }
+    },
+    "extra": {
+        "phpstan": {
+            "includes": [
+                "phpstan-extension.neon"
+            ]
+        }
+    },
+    "minimum-stability": "stable",
+    "config": {
+        "sort-packages": true,
+        "allow-plugins": {
+            "phpstan/extension-installer": true
+        }
+    },
+    "scripts": {
+        "test": "phpunit",
+        "test:coverage": "phpunit --coverage-html coverage",
+        "analyze": "phpstan analyze --memory-limit=256M",
+        "analyze:baseline": "phpstan analyze --memory-limit=256M --generate-baseline",
+        "analyse": "@analyze",
+        "analyse:baseline": "@analyze:baseline",
+        "format": "php-cs-fixer fix --allow-risky=yes",
+        "format:check": "php-cs-fixer fix --dry-run --diff --allow-risky=yes",
+        "check": [
+            "@format:check",
+            "@analyze",
+            "@test"
+        ]
+    }
+}
