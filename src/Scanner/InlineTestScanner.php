@@ -4,13 +4,19 @@ declare(strict_types=1);
 
 namespace PHPUnit\InlineTests\Scanner;
 
+use PHPUnit\Framework\Attributes\After;
+use PHPUnit\Framework\Attributes\AfterClass;
+use PHPUnit\Framework\Attributes\Before;
+use PHPUnit\Framework\Attributes\BeforeClass;
 use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\TestCase;
 use RecursiveDirectoryIterator;
 use RecursiveIteratorIterator;
 use ReflectionAttribute;
 use ReflectionClass;
 use ReflectionException;
+use ReflectionFunction;
 use ReflectionMethod;
 use SplFileInfo;
 
@@ -63,6 +69,7 @@ final class InlineTestScanner
                 continue;
             }
 
+            // Scan for class-based tests
             $classNames = $this->extractClassNames($file->getPathname());
 
             foreach ($classNames as $className) {
@@ -77,7 +84,11 @@ final class InlineTestScanner
                     if (!empty($testMethods)) {
                         $testClasses[] = new InlineTestClass(
                             $reflection,
-                            $testMethods
+                            $testMethods,
+                            $this->findLifecycleMethods($reflection, Before::class),
+                            $this->findLifecycleMethods($reflection, After::class),
+                            $this->findLifecycleMethods($reflection, BeforeClass::class),
+                            $this->findLifecycleMethods($reflection, AfterClass::class)
                         );
                     }
                 } catch (ReflectionException) {
@@ -85,6 +96,10 @@ final class InlineTestScanner
                     continue;
                 }
             }
+
+            // Scan for function-based tests
+            $functionTests = $this->extractTestFunctions($file->getPathname());
+            $testClasses = array_merge($testClasses, $functionTests);
         }
 
         return $testClasses;
@@ -92,6 +107,7 @@ final class InlineTestScanner
 
     /**
      * Extracts all fully qualified class names from a PHP file.
+     * Supports multiple namespace declarations in a single file.
      *
      * @return array<string>
      */
@@ -104,20 +120,75 @@ final class InlineTestScanner
         }
 
         $classNames = [];
-        $namespace = '';
+        $tokens = token_get_all($contents);
+        $currentNamespace = '';
+        $i = 0;
+        $count = count($tokens);
 
-        // Extract namespace
-        if (preg_match('/namespace\s+([^;]+);/', $contents, $matches)) {
-            $namespace = trim($matches[1]);
-        }
+        while ($i < $count) {
+            $token = $tokens[$i];
 
-        // Extract all class, interface, trait, and enum names
-        if (preg_match_all('/^\s*(?:final\s+|abstract\s+)?(class|interface|trait|enum)\s+(\w+)/m', $contents, $matches, PREG_SET_ORDER)) {
-            foreach ($matches as $match) {
-                $className = $match[2];
-                $fqcn = $namespace !== '' ? $namespace . '\\' . $className : $className;
-                $classNames[] = $fqcn;
+            // Track namespace changes
+            if (is_array($token) && $token[0] === T_NAMESPACE) {
+                $i++;
+                $namespaceParts = [];
+
+                // Collect all parts of the namespace
+                while ($i < $count) {
+                    $token = $tokens[$i];
+
+                    if (is_array($token)) {
+                        if ($token[0] === T_NAME_QUALIFIED || $token[0] === T_NAME_FULLY_QUALIFIED) {
+                            $namespaceParts[] = $token[1];
+                        } elseif ($token[0] === T_STRING) {
+                            $namespaceParts[] = $token[1];
+                        } elseif ($token[0] === T_NS_SEPARATOR) {
+                            // Continue collecting
+                        } elseif ($token[0] === T_WHITESPACE) {
+                            // Skip whitespace
+                        } else {
+                            break;
+                        }
+                    } elseif ($token === ';' || $token === '{') {
+                        break;
+                    }
+
+                    $i++;
+                }
+
+                $currentNamespace = implode('\\', $namespaceParts);
+                continue;
             }
+
+            // Look for class/interface/trait/enum declarations
+            if (is_array($token) && in_array($token[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+                // Skip "final" and "abstract" keywords
+                $j = $i - 1;
+                while ($j >= 0 && is_array($tokens[$j])) {
+                    if (in_array($tokens[$j][0], [T_FINAL, T_ABSTRACT, T_WHITESPACE], true)) {
+                        $j--;
+                    } else {
+                        break;
+                    }
+                }
+
+                // Find the class name
+                $i++;
+                while ($i < $count) {
+                    $token = $tokens[$i];
+
+                    if (is_array($token) && $token[0] === T_STRING) {
+                        $className = $token[1];
+                        $fqcn = $currentNamespace !== '' ? $currentNamespace . '\\' . $className : $className;
+                        $classNames[] = $fqcn;
+                        break;
+                    }
+
+                    $i++;
+                }
+            }
+
+            $i++;
         }
 
         return $classNames;
@@ -126,11 +197,19 @@ final class InlineTestScanner
     /**
      * Finds all methods in a class that have the #[Test] attribute.
      *
+     * Only returns test methods for classes that don't extend TestCase.
+     * Classes extending TestCase should be discovered by PHPUnit's normal discovery.
+     *
      * @param ReflectionClass<object> $reflection
      * @return array<ReflectionMethod>
      */
     private function findTestMethods(ReflectionClass $reflection): array
     {
+        // Skip classes that extend TestCase - let PHPUnit handle them normally
+        if ($reflection->isSubclassOf(TestCase::class)) {
+            return [];
+        }
+
         $testMethods = [];
 
         foreach ($reflection->getMethods() as $method) {
@@ -168,4 +247,353 @@ final class InlineTestScanner
         return $attribute->methodName();
     }
 
+    /**
+     * Finds all methods in a class that have a specific lifecycle attribute.
+     *
+     * @param ReflectionClass<object> $reflection
+     * @param class-string $attributeClass
+     * @return array<ReflectionMethod>
+     */
+    private function findLifecycleMethods(ReflectionClass $reflection, string $attributeClass): array
+    {
+        $lifecycleMethods = [];
+
+        foreach ($reflection->getMethods() as $method) {
+            $attributes = $method->getAttributes(
+                $attributeClass,
+                ReflectionAttribute::IS_INSTANCEOF
+            );
+
+            if (!empty($attributes)) {
+                $lifecycleMethods[] = $method;
+            }
+        }
+
+        return $lifecycleMethods;
+    }
+
+    /**
+     * Extract test functions from a PHP file and group them by namespace.
+     *
+     * @return array<InlineTestClass>
+     */
+    private function extractTestFunctions(string $filePath): array
+    {
+        // Get functions before including file
+        $functionsBefore = get_defined_functions()['user'];
+
+        // Include the file to make functions available (use include to allow re-inclusion)
+        // Note: We track what was loaded before to handle files included multiple times
+        include_once $filePath;
+
+        // Get functions after including file
+        $functionsAfter = get_defined_functions()['user'];
+
+        // Find newly defined functions
+        $newFunctions = array_diff($functionsAfter, $functionsBefore);
+
+        // If no new functions (file was already included), we need to parse the file
+        // to find which functions it defines and check them all
+        if (empty($newFunctions)) {
+            $newFunctions = $this->extractFunctionNamesFromFile($filePath);
+        }
+
+        // Group functions by namespace
+        $namespaceGroups = [];
+
+        foreach ($newFunctions as $functionName) {
+            try {
+                if (!function_exists($functionName)) {
+                    continue;
+                }
+
+                $reflection = new ReflectionFunction($functionName);
+
+                // Get namespace from function (namespace is part of the function name)
+                $namespace = $reflection->getNamespaceName();
+
+                // Check if function has Test attribute
+                $testAttributes = $reflection->getAttributes(
+                    Test::class,
+                    ReflectionAttribute::IS_INSTANCEOF
+                );
+
+                if (!empty($testAttributes)) {
+                    if (!isset($namespaceGroups[$namespace])) {
+                        $namespaceGroups[$namespace] = [
+                            'tests' => [],
+                            'before' => [],
+                            'after' => [],
+                            'beforeClass' => [],
+                            'afterClass' => [],
+                        ];
+                    }
+                    $namespaceGroups[$namespace]['tests'][] = $reflection;
+                }
+
+                // Check for lifecycle attributes
+                if (!empty($reflection->getAttributes(Before::class, ReflectionAttribute::IS_INSTANCEOF))) {
+                    if (!isset($namespaceGroups[$namespace])) {
+                        $namespaceGroups[$namespace] = [
+                            'tests' => [],
+                            'before' => [],
+                            'after' => [],
+                            'beforeClass' => [],
+                            'afterClass' => [],
+                        ];
+                    }
+                    $namespaceGroups[$namespace]['before'][] = $reflection;
+                }
+
+                if (!empty($reflection->getAttributes(After::class, ReflectionAttribute::IS_INSTANCEOF))) {
+                    if (!isset($namespaceGroups[$namespace])) {
+                        $namespaceGroups[$namespace] = [
+                            'tests' => [],
+                            'before' => [],
+                            'after' => [],
+                            'beforeClass' => [],
+                            'afterClass' => [],
+                        ];
+                    }
+                    $namespaceGroups[$namespace]['after'][] = $reflection;
+                }
+
+                if (!empty($reflection->getAttributes(BeforeClass::class, ReflectionAttribute::IS_INSTANCEOF))) {
+                    if (!isset($namespaceGroups[$namespace])) {
+                        $namespaceGroups[$namespace] = [
+                            'tests' => [],
+                            'before' => [],
+                            'after' => [],
+                            'beforeClass' => [],
+                            'afterClass' => [],
+                        ];
+                    }
+                    $namespaceGroups[$namespace]['beforeClass'][] = $reflection;
+                }
+
+                if (!empty($reflection->getAttributes(AfterClass::class, ReflectionAttribute::IS_INSTANCEOF))) {
+                    if (!isset($namespaceGroups[$namespace])) {
+                        $namespaceGroups[$namespace] = [
+                            'tests' => [],
+                            'before' => [],
+                            'after' => [],
+                            'beforeClass' => [],
+                            'afterClass' => [],
+                        ];
+                    }
+                    $namespaceGroups[$namespace]['afterClass'][] = $reflection;
+                }
+
+            } catch (\ReflectionException) {
+                continue;
+            }
+        }
+
+        // Convert namespace groups to InlineTestClass instances
+        $testClasses = [];
+        foreach ($namespaceGroups as $namespace => $functions) {
+            if (!empty($functions['tests'])) {
+                $testClasses[] = new InlineTestClass(
+                    null, // No class reflection for function-based tests
+                    $functions['tests'],
+                    $functions['before'],
+                    $functions['after'],
+                    $functions['beforeClass'],
+                    $functions['afterClass'],
+                    $namespace
+                );
+            }
+        }
+
+        return $testClasses;
+    }
+
+    /**
+     * Extract function names from a file by parsing tokens.
+     * Used when file was already included.
+     *
+     * @return array<string>
+     */
+    private function extractFunctionNamesFromFile(string $filePath): array
+    {
+        $contents = @file_get_contents($filePath);
+        if ($contents === false) {
+            return [];
+        }
+
+        $functions = [];
+        $tokens = token_get_all($contents);
+        $currentNamespace = '';
+        $i = 0;
+        $count = count($tokens);
+        $braceDepth = 0;
+        $inClass = false;
+
+        while ($i < $count) {
+            $token = $tokens[$i];
+
+            // Track namespace changes
+            if (is_array($token) && $token[0] === T_NAMESPACE) {
+                $i++;
+                $namespaceParts = [];
+
+                while ($i < $count) {
+                    $token = $tokens[$i];
+
+                    if (is_array($token)) {
+                        if ($token[0] === T_NAME_QUALIFIED || $token[0] === T_NAME_FULLY_QUALIFIED) {
+                            $namespaceParts[] = $token[1];
+                        } elseif ($token[0] === T_STRING) {
+                            $namespaceParts[] = $token[1];
+                        } elseif ($token[0] === T_NS_SEPARATOR) {
+                            // Continue collecting
+                        } elseif ($token[0] === T_WHITESPACE) {
+                            // Skip whitespace
+                        } else {
+                            break;
+                        }
+                    } elseif ($token === ';' || $token === '{') {
+                        break;
+                    }
+
+                    $i++;
+                }
+
+                $currentNamespace = implode('\\', $namespaceParts);
+                $i++;
+                continue;
+            }
+
+            // Track class/interface/trait declarations
+            if (is_array($token) && in_array($token[0], [T_CLASS, T_INTERFACE, T_TRAIT, T_ENUM], true)) {
+                $inClass = true;
+                $i++;
+                continue;
+            }
+
+            // Track braces to know when we exit a class
+            if ($token === '{') {
+                $braceDepth++;
+            } elseif ($token === '}') {
+                $braceDepth--;
+                if ($braceDepth === 0) {
+                    $inClass = false;
+                }
+            }
+
+            // Look for function declarations (only at namespace level, not in classes)
+            if (is_array($token) && $token[0] === T_FUNCTION && !$inClass) {
+                // Find the function name
+                $i++;
+                while ($i < $count) {
+                    $token = $tokens[$i];
+
+                    if (is_array($token) && $token[0] === T_STRING) {
+                        $functionName = $token[1];
+                        $fullName = $currentNamespace !== '' ? $currentNamespace . '\\' . $functionName : $functionName;
+                        $functions[] = $fullName;
+                        break;
+                    }
+
+                    $i++;
+                }
+            }
+
+            $i++;
+        }
+
+        return $functions;
+    }
+
+    /**
+     * Extract function names and their namespaces from a PHP file.
+     *
+     * @return array<array{string, string}> Array of [namespace, functionName] tuples
+     */
+    private function extractFunctionNames(string $filePath): array
+    {
+        $contents = file_get_contents($filePath);
+        if ($contents === false) {
+            return [];
+        }
+
+        $functions = [];
+        $tokens = token_get_all($contents);
+        $currentNamespace = '';
+        $i = 0;
+        $count = count($tokens);
+
+        while ($i < $count) {
+            $token = $tokens[$i];
+
+            // Track namespace changes
+            if (is_array($token) && $token[0] === T_NAMESPACE) {
+                $i++;
+                $namespaceParts = [];
+
+                while ($i < $count) {
+                    $token = $tokens[$i];
+
+                    if (is_array($token)) {
+                        if ($token[0] === T_NAME_QUALIFIED || $token[0] === T_NAME_FULLY_QUALIFIED) {
+                            $namespaceParts[] = $token[1];
+                        } elseif ($token[0] === T_STRING) {
+                            $namespaceParts[] = $token[1];
+                        } elseif ($token[0] === T_NS_SEPARATOR) {
+                            // Continue collecting
+                        } elseif ($token[0] === T_WHITESPACE) {
+                            // Skip whitespace
+                        } else {
+                            break;
+                        }
+                    } elseif ($token === ';' || $token === '{') {
+                        break;
+                    }
+
+                    $i++;
+                }
+
+                $currentNamespace = implode('\\', $namespaceParts);
+                continue;
+            }
+
+            // Look for function declarations (but not in classes)
+            if (is_array($token) && $token[0] === T_FUNCTION) {
+                // Check if we're inside a class by looking backwards
+                $inClass = false;
+                for ($j = $i - 1; $j >= 0; $j--) {
+                    if (!is_array($tokens[$j])) {
+                        continue;
+                    }
+                    if (in_array($tokens[$j][0], [T_CLASS, T_INTERFACE, T_TRAIT], true)) {
+                        $inClass = true;
+                        break;
+                    }
+                    if ($tokens[$j][0] === T_NAMESPACE) {
+                        break;
+                    }
+                }
+
+                if (!$inClass) {
+                    // Find the function name
+                    $i++;
+                    while ($i < $count) {
+                        $token = $tokens[$i];
+
+                        if (is_array($token) && $token[0] === T_STRING) {
+                            $functionName = $token[1];
+                            $functions[] = [$currentNamespace, $functionName];
+                            break;
+                        }
+
+                        $i++;
+                    }
+                }
+            }
+
+            $i++;
+        }
+
+        return $functions;
+    }
 }

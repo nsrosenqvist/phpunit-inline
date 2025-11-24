@@ -93,8 +93,81 @@ final class DataProviderTest extends TestCase
     #[Test]
     public function dataProviderTestsExecuteSuccessfully(): void
     {
-        // Skip this test - it requires executing a sub-suite which is complex
-        // The data provider functionality is verified by the count test above
-        $this->markTestSkipped('Sub-suite execution test skipped - data provider functionality verified by count test');
+        $scanner = new InlineTestScanner([__DIR__ . '/../Fixtures']);
+        $testClasses = $scanner->scan();
+
+        $dataProviderClass = null;
+        foreach ($testClasses as $testClass) {
+            if ($testClass->getClassName() === DataProvider::class) {
+                $dataProviderClass = $testClass;
+                break;
+            }
+        }
+
+        $this->assertNotNull($dataProviderClass, 'DataProvider should be discovered');
+
+        $builder = new InlineTestSuiteBuilder();
+        $suite = $builder->build([$dataProviderClass]);
+
+        // Get the generated test suite
+        $suites = iterator_to_array($suite->tests());
+        $this->assertNotEmpty($suites);
+        $classSuite = $suites[0];
+        $this->assertInstanceOf(\PHPUnit\Framework\TestSuite::class, $classSuite);
+
+        // Get individual test cases/suites from the class suite
+        // Note: With data providers, PHPUnit creates DataProviderTestSuite objects
+        $tests = iterator_to_array($classSuite->tests());
+        $this->assertNotEmpty($tests);
+
+        // Find a regular TestCase (not a DataProviderTestSuite)
+        $testCase = null;
+        foreach ($tests as $test) {
+            if ($test instanceof \PHPUnit\Framework\TestCase) {
+                $testCase = $test;
+                break;
+            }
+            // If it's a DataProviderTestSuite, get the first test from it
+            if ($test instanceof \PHPUnit\Framework\TestSuite) {
+                $subTests = iterator_to_array($test->tests());
+                if (!empty($subTests) && $subTests[0] instanceof \PHPUnit\Framework\TestCase) {
+                    $testCase = $subTests[0];
+                    break;
+                }
+            }
+        }
+
+        $this->assertNotNull($testCase, 'Should find at least one TestCase');
+        $this->assertInstanceOf(\PHPUnit\Framework\TestCase::class, $testCase);
+
+        $generatedClass = new \ReflectionClass($testCase);
+
+        // Verify data provider methods were generated
+        $this->assertTrue(
+            $generatedClass->hasMethod('additionProvider'),
+            'Generated class should have additionProvider method'
+        );
+        $this->assertTrue(
+            $generatedClass->hasMethod('multiplicationProvider'),
+            'Generated class should have multiplicationProvider method'
+        );
+        $this->assertTrue(
+            $generatedClass->hasMethod('privateStaticProvider'),
+            'Generated class should have privateStaticProvider method'
+        );
+        $this->assertTrue(
+            $generatedClass->hasMethod('privateInstanceProvider'),
+            'Generated class should have privateInstanceProvider method'
+        );
+
+        // Verify data provider methods are static
+        $additionProvider = $generatedClass->getMethod('additionProvider');
+        $this->assertTrue($additionProvider->isStatic(), 'Data provider should be static');
+        $this->assertTrue($additionProvider->isPublic(), 'Data provider should be public');
+
+        // Verify test methods have DataProvider attributes
+        $testAddition = $generatedClass->getMethod('testAddition');
+        $attributes = $testAddition->getAttributes(\PHPUnit\Framework\Attributes\DataProvider::class);
+        $this->assertNotEmpty($attributes, 'testAddition should have DataProvider attribute');
     }
 }
