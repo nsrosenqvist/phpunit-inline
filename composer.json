@@ -1,12 +1,12 @@
 {
-    "name": "phpunit/inline-tests",
+    "name": "nsrosenqvist/phpunit-inline",
     "description": "PHPUnit extension for writing tests inline with application code using native #[Test] attributes",
     "type": "library",
     "license": "MIT",
     "authors": [
         {
-            "name": "Niklas",
-            "email": "author@example.com"
+            "name": "Niklas Rosenqvist",
+            "email": "niklas.s.rosenqvist@gmail.com"
         }
     ],
     "require": {
@@ -20,12 +20,12 @@
     },
     "autoload": {
         "psr-4": {
-            "PHPUnit\\InlineTests\\": "src/"
+            "NSRosenqvist\\PHPUnitInline\\": "src/"
         }
     },
     "autoload-dev": {
         "psr-4": {
-            "PHPUnit\\InlineTests\\Tests\\": "tests/"
+            "NSRosenqvist\\PHPUnitInline\\Tests\\": "tests/"
         }
     },
     "extra": {

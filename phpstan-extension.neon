@@ -1,6 +1,6 @@
 services:
     -
-        class: PHPUnit\InlineTests\PHPStan\InlineTestMethodReflectionExtension
+        class: NSRosenqvist\PHPUnitInline\PHPStan\InlineTestMethodReflectionExtension
         tags:
             - phpstan.broker.methodsClassReflectionExtension
 
@@ -33,11 +33,11 @@ parameters:
             path: '*'
         # TestProxy uses __call() to route all method calls dynamically
         -
-            message: '#^Call to an undefined method PHPUnit\\InlineTests\\TestCase\\TestProxy::.+\(\)\.$#'
+            message: '#^Call to an undefined method NSRosenqvist\\PHPUnitInline\\TestCase\\TestProxy::.+\(\)\.$#'
             path: 'tests/*'
         # Generic type covariance for ReflectionClass - test infrastructure limitation
         -
-            message: '#^Parameter .+ of static method PHPUnit\\InlineTests\\TestCase\\InlineTestCase::createTest\(\) expects ReflectionClass<object>, ReflectionClass<.+> given\.$#'
+            message: '#^Parameter .+ of static method NSRosenqvist\\PHPUnitInline\\TestCase\\InlineTestCase::createTest\(\) expects ReflectionClass<object>, ReflectionClass<.+> given\.$#'
             path: 'tests/*'
         # Function-based tests: $this is bound to TestCase context via closures
         -
@@ -64,7 +64,7 @@ parameters:
             path: tests/Fixtures/FunctionBasedTestsWithDataProvider.php
         # Test helper methods that verify scanner behavior
         -
-            message: '#^Method PHPUnit\\InlineTests\\Scanner\\InlineTestScanner::scan\(\) invoked with 1 parameter, 0 required\.$#'
+            message: '#^Method NSRosenqvist\\PHPUnitInline\\Scanner\\InlineTestScanner::scan\(\) invoked with 1 parameter, 0 required\.$#'
             path: tests/Integration/*
         -
             message: '#^Call to an undefined method PHPUnit\\Framework\\Test::tests\(\)\.$#'

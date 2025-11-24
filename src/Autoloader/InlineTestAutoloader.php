@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Autoloader;
+namespace NSRosenqvist\PHPUnitInline\Autoloader;
 
 /**
  * Custom autoloader for inline test classes that don't follow PSR-4 file paths.

@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Extension;
+namespace NSRosenqvist\PHPUnitInline\Extension;
 
 use PHPUnit\Event\Application\Started;
 use PHPUnit\Event\Application\StartedSubscriber;

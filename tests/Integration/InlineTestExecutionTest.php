@@ -2,14 +2,14 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Tests\Integration;
+namespace NSRosenqvist\PHPUnitInline\Tests\Integration;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use PHPUnit\InlineTests\Scanner\InlineTestScanner;
-use PHPUnit\InlineTests\TestCase\InlineTestCase;
-use PHPUnit\InlineTests\TestCase\InlineTestSuiteBuilder;
-use PHPUnit\InlineTests\Tests\Fixtures\Calculator;
+use NSRosenqvist\PHPUnitInline\Scanner\InlineTestScanner;
+use NSRosenqvist\PHPUnitInline\TestCase\InlineTestCase;
+use NSRosenqvist\PHPUnitInline\TestCase\InlineTestSuiteBuilder;
+use NSRosenqvist\PHPUnitInline\Tests\Fixtures\Calculator;
 
 /**
  * Integration test that verifies the entire flow works together.

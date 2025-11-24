@@ -29,7 +29,7 @@ Inspired by Rust's `#[test]` attribute, this extension allows you to:
 ## Installation
 
 ```bash
-composer require --dev phpunit/inline-tests
+composer require --dev nsrosenqvist/phpunit-inline
 ```
 
 ## Configuration
@@ -41,7 +41,7 @@ For **namespace-based tests** (Rust-style `mod tests` pattern), you need to regi
 Update your `phpunit.xml` bootstrap:
 
 ```xml
-<phpunit bootstrap="vendor/phpunit/inline-tests/src/bootstrap.php">
+<phpunit bootstrap="vendor/nsrosenqvist/phpunit-inline/src/bootstrap.php">
     <!-- ... -->
 </phpunit>
 ```
@@ -54,7 +54,7 @@ If you already have a custom bootstrap file, add this at the top:
 require_once __DIR__ . '/vendor/autoload.php';
 
 // Register inline test autoloader
-use PHPUnit\InlineTests\Autoloader\InlineTestAutoloader;
+use NSRosenqvist\PHPUnitInline\Autoloader\InlineTestAutoloader;
 
 $autoloader = InlineTestAutoloader::fromComposerJson(__DIR__ . '/composer.json');
 $autoloader->register();
@@ -71,14 +71,14 @@ Add the extension to your `phpunit.xml`:
     <!-- ... other configuration ... -->
     
     <extensions>
-        <bootstrap class="PHPUnit\InlineTests\Extension\InlineTestExtension">
+        <bootstrap class="NSRosenqvist\PHPUnitInline\Extension\InlineTestExtension">
             <parameter name="scanDirectories" value="src,app"/>
         </bootstrap>
     </extensions>
     
     <testsuites>
         <testsuite name="Inline Tests">
-            <file>vendor/phpunit/inline-tests/tests/InlineTestsSuite.php</file>
+            <file>vendor/nsrosenqvist/phpunit-inline/tests/InlineTestsSuite.php</file>
         </testsuite>
         
         <!-- Your regular test suites -->

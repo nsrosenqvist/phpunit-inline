@@ -11,7 +11,7 @@ declare(strict_types=1);
 require_once __DIR__ . '/../src/bootstrap.php';
 
 // Add test fixture namespaces manually for our own tests
-use PHPUnit\InlineTests\Autoloader\InlineTestAutoloader;
+use NSRosenqvist\PHPUnitInline\Autoloader\InlineTestAutoloader;
 
 // Get the registered autoloader and add our test fixtures
 $autoloader = new InlineTestAutoloader();

@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Tests\Integration;
+namespace NSRosenqvist\PHPUnitInline\Tests\Integration;
 
 use PHPUnit\Framework\TestCase;
-use PHPUnit\InlineTests\Scanner\InlineTestScanner;
-use PHPUnit\InlineTests\TestCase\InlineTestSuiteBuilder;
+use NSRosenqvist\PHPUnitInline\Scanner\InlineTestScanner;
+use NSRosenqvist\PHPUnitInline\TestCase\InlineTestSuiteBuilder;
 
 final class FunctionBasedDataProviderExecutionTest extends TestCase
 {

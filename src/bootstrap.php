@@ -8,7 +8,7 @@ declare(strict_types=1);
  * This file registers the custom autoloader for inline test classes.
  * Include this in your phpunit.xml bootstrap attribute:
  *
- * <phpunit bootstrap="vendor/phpunit/inline-tests/src/bootstrap.php">
+ * <phpunit bootstrap="vendor/nsrosenqvist/phpunit-inline/src/bootstrap.php">
  *     ...
  * </phpunit>
  *
@@ -16,7 +16,7 @@ declare(strict_types=1);
  *
  * require_once 'vendor/autoload.php';
  *
- * $autoloader = PHPUnit\InlineTests\Autoloader\InlineTestAutoloader::fromComposerJson(__DIR__ . '/composer.json');
+ * $autoloader = NSRosenqvist\PHPUnitInline\Autoloader\InlineTestAutoloader::fromComposerJson(__DIR__ . '/composer.json');
  * $autoloader->register();
  */
 
@@ -38,7 +38,7 @@ if ($vendorAutoload !== null) {
     require_once $vendorAutoload;
 }
 
-use PHPUnit\InlineTests\Autoloader\InlineTestAutoloader;
+use NSRosenqvist\PHPUnitInline\Autoloader\InlineTestAutoloader;
 
 // Find the project's composer.json by walking up the directory tree
 $dir = __DIR__;

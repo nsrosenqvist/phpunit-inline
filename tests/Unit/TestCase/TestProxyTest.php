@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Tests\Unit\TestCase;
+namespace NSRosenqvist\PHPUnitInline\Tests\Unit\TestCase;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use PHPUnit\InlineTests\TestCase\TestProxy;
+use NSRosenqvist\PHPUnitInline\TestCase\TestProxy;
 use ReflectionClass;
 use ReflectionMethod;
 
