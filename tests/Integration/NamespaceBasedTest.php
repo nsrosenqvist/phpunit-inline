@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Tests\Integration;
+namespace NSRosenqvist\PHPUnitInline\Tests\Integration;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use PHPUnit\InlineTests\Scanner\InlineTestScanner;
+use NSRosenqvist\PHPUnitInline\Scanner\InlineTestScanner;
 
 final class NamespaceBasedTest extends TestCase
 {

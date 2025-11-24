@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\PHPStan;
+namespace NSRosenqvist\PHPUnitInline\PHPStan;
 
 use PHPStan\Reflection\ClassReflection;
 use PHPStan\Reflection\MethodReflection;

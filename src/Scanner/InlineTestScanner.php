@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Scanner;
+namespace NSRosenqvist\PHPUnitInline\Scanner;
 
 use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\AfterClass;

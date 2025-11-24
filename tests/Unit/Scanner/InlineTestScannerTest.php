@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Tests\Unit\Scanner;
+namespace NSRosenqvist\PHPUnitInline\Tests\Unit\Scanner;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use PHPUnit\InlineTests\Scanner\InlineTestScanner;
-use PHPUnit\InlineTests\Tests\Fixtures\Calculator;
+use NSRosenqvist\PHPUnitInline\Scanner\InlineTestScanner;
+use NSRosenqvist\PHPUnitInline\Tests\Fixtures\Calculator;
 
 final class InlineTestScannerTest extends TestCase
 {

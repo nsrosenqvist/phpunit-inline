@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\TestCase;
+namespace NSRosenqvist\PHPUnitInline\TestCase;
 
 use PHPUnit\Framework\TestCase;
 use ReflectionMethod;

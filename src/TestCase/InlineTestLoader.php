@@ -2,11 +2,11 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\TestCase;
+namespace NSRosenqvist\PHPUnitInline\TestCase;
 
 use PHPUnit\Framework\TestSuite;
-use PHPUnit\InlineTests\Extension\InlineTestExtension;
-use PHPUnit\InlineTests\Scanner\InlineTestScanner;
+use NSRosenqvist\PHPUnitInline\Extension\InlineTestExtension;
+use NSRosenqvist\PHPUnitInline\Scanner\InlineTestScanner;
 use PHPUnit\Runner\TestSuiteLoader;
 
 /**

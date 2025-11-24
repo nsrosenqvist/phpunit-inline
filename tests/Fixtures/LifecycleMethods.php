@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Tests\Fixtures;
+namespace NSRosenqvist\PHPUnitInline\Tests\Fixtures;
 
 use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\AfterClass;
@@ -23,21 +23,21 @@ final class LifecycleMethods
     #[BeforeClass]
     public static function setUpBeforeClass(): void
     {
-        \PHPUnit\InlineTests\Tests\Fixtures\LifecycleMethods::$executionLog = [];
-        \PHPUnit\InlineTests\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'beforeClass';
+        \NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods::$executionLog = [];
+        \NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'beforeClass';
     }
 
     #[Before]
     public function setUp(): void
     {
-        \PHPUnit\InlineTests\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'before';
+        \NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'before';
         $this->value = 10;
     }
 
     #[Test]
     public function testOne(): void
     {
-        \PHPUnit\InlineTests\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'testOne';
+        \NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'testOne';
         $this->assertEquals(10, $this->value);
         $this->value = 20;
     }
@@ -45,7 +45,7 @@ final class LifecycleMethods
     #[Test]
     public function testTwo(): void
     {
-        \PHPUnit\InlineTests\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'testTwo';
+        \NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'testTwo';
         // Value should be reset to 10 by setUp
         $this->assertEquals(10, $this->value);
     }
@@ -53,17 +53,17 @@ final class LifecycleMethods
     #[After]
     public function tearDown(): void
     {
-        \PHPUnit\InlineTests\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'after';
+        \NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'after';
     }
 
     #[AfterClass]
     public static function tearDownAfterClass(): void
     {
-        \PHPUnit\InlineTests\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'afterClass';
+        \NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'afterClass';
     }
 
     public static function resetLog(): void
     {
-        \PHPUnit\InlineTests\Tests\Fixtures\LifecycleMethods::$executionLog = [];
+        \NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods::$executionLog = [];
     }
 }

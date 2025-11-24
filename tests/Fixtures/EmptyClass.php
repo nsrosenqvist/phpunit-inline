@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Tests\Fixtures;
+namespace NSRosenqvist\PHPUnitInline\Tests\Fixtures;
 
 use PHPUnit\Framework\Attributes\Test;
 

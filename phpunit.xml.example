@@ -10,7 +10,7 @@
     </testsuites>
 
     <extensions>
-        <bootstrap class="PHPUnit\InlineTests\Extension\InlineTestExtension">
+        <bootstrap class="NSRosenqvist\PHPUnitInline\Extension\InlineTestExtension">
             <parameter name="scanDirectories" value="src,app"/>
         </bootstrap>
     </extensions>

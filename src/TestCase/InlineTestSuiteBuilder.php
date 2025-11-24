@@ -2,10 +2,10 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\TestCase;
+namespace NSRosenqvist\PHPUnitInline\TestCase;
 
 use PHPUnit\Framework\TestSuite;
-use PHPUnit\InlineTests\Scanner\InlineTestClass;
+use NSRosenqvist\PHPUnitInline\Scanner\InlineTestClass;
 
 /**
  * Builds PHPUnit TestSuite instances from inline test classes.

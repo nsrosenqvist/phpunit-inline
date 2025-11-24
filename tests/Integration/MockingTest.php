@@ -2,12 +2,12 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\Tests\Integration;
+namespace NSRosenqvist\PHPUnitInline\Tests\Integration;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
-use PHPUnit\InlineTests\Scanner\InlineTestScanner;
-use PHPUnit\InlineTests\TestCase\InlineTestCase;
+use NSRosenqvist\PHPUnitInline\Scanner\InlineTestScanner;
+use NSRosenqvist\PHPUnitInline\TestCase\InlineTestCase;
 
 /**
  * Test to verify that PHPUnit mocking works with inline tests.
@@ -61,7 +61,7 @@ final class MockingTestFixture
     private function testCreateMockWorks(): void
     {
         // Create a mock using fully qualified name
-        $mock = $this->createMock(\PHPUnit\InlineTests\Tests\Integration\DataService::class);
+        $mock = $this->createMock(\NSRosenqvist\PHPUnitInline\Tests\Integration\DataService::class);
         $mock->expects($this->once())
             ->method('getData')
             ->willReturn('mocked data');
@@ -75,7 +75,7 @@ final class MockingTestFixture
     private function testCreateStubWorks(): void
     {
         // Create a stub using fully qualified name
-        $stub = $this->createStub(\PHPUnit\InlineTests\Tests\Integration\DataService::class);
+        $stub = $this->createStub(\NSRosenqvist\PHPUnitInline\Tests\Integration\DataService::class);
         $stub->method('getData')
             ->willReturn('stubbed data');
 

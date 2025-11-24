@@ -2,7 +2,7 @@
 
 declare(strict_types=1);
 
-namespace PHPUnit\InlineTests\PHPStan;
+namespace NSRosenqvist\PHPUnitInline\PHPStan;
 
 use PhpParser\Node;
 use PHPStan\Analyser\Scope;
