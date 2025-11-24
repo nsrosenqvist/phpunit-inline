@@ -1,0 +1,45 @@
+services:
+    -
+        class: PHPUnit\InlineTests\PHPStan\InlineTestMethodReflectionExtension
+        tags:
+            - phpstan.broker.methodsClassReflectionExtension
+
+parameters:
+    reportUnmatchedIgnoredErrors: false
+    ignoreErrors:
+        # Methods with #[Test] attribute are invoked via reflection by the test runner
+        -
+            message: '#^Method .+::test.+\(\) is unused\.$#'
+            path: '*'
+        # Data provider methods are invoked via reflection
+        -
+            message: '#^(Static )?[Mm]ethod .+::.+(Provider|provider)\(\) is unused\.$#'
+            path: '*'
+        # Anonymous test helper classes have private methods that are intentionally unused
+        -
+            message: '#^Method class@anonymous.+::privateMethod\(\) is unused\.$#'
+            path: '*'
+        # Generic type covariance for ReflectionClass - test infrastructure limitation
+        -
+            message: '#^Parameter .+ expects ReflectionClass<object>, ReflectionClass<.+> given\.$#'
+            path: 'tests/*'
+        # Test assertions that verify successful execution will be always-true
+        -
+            message: '#^Call to method PHPUnit\\Framework\\Assert::(assertTrue|assertSame|assertEquals|assertIsArray)\(\) .+ will always evaluate to true\.$#'
+            path: 'tests/*'
+        # Protected TestCase methods (expectException, etc.) are accessible via TestProxy's __call()
+        -
+            message: '#^Call to protected method .+ of class PHPUnit\\Framework\\TestCase\.$#'
+            path: '*'
+        # TestProxy uses __call() to route all method calls dynamically
+        -
+            message: '#^Call to an undefined method PHPUnit\\InlineTests\\TestCase\\TestProxy::.+\(\)\.$#'
+            path: 'tests/*'
+        # Generic type covariance for ReflectionClass - test infrastructure limitation
+        -
+            message: '#^Parameter .+ of static method PHPUnit\\InlineTests\\TestCase\\InlineTestCase::createTest\(\) expects ReflectionClass<object>, ReflectionClass<.+> given\.$#'
+            path: 'tests/*'
+
+
+
+
