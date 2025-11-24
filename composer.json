@@ -43,7 +43,7 @@
         }
     },
     "scripts": {
-        "test": "phpunit",
+        "test": "phpunit --testdox",
         "test:coverage": "phpunit --coverage-html coverage",
         "analyze": "phpstan analyze --memory-limit=256M",
         "analyze:baseline": "phpstan analyze --memory-limit=256M --generate-baseline",

@@ -28,7 +28,35 @@ composer require --dev phpunit/inline-tests
 
 ## Configuration
 
-### Step 1: Configure the Extension
+### Step 1: Configure PHPUnit Bootstrap
+
+For **namespace-based tests** (Rust-style `mod tests` pattern), you need to register the custom autoloader.
+
+Update your `phpunit.xml` bootstrap:
+
+```xml
+<phpunit bootstrap="vendor/phpunit/inline-tests/src/bootstrap.php">
+    <!-- ... -->
+</phpunit>
+```
+
+If you already have a custom bootstrap file, add this at the top:
+
+```php
+<?php
+// Load Composer autoloader
+require_once __DIR__ . '/vendor/autoload.php';
+
+// Register inline test autoloader
+use PHPUnit\InlineTests\Autoloader\InlineTestAutoloader;
+
+$autoloader = InlineTestAutoloader::fromComposerJson(__DIR__ . '/composer.json');
+$autoloader->register();
+
+// ... rest of your bootstrap code
+```
+
+### Step 2: Configure the Extension
 
 Add the extension to your `phpunit.xml`:
 
@@ -55,7 +83,7 @@ Add the extension to your `phpunit.xml`:
 </phpunit>
 ```
 
-### Step 2: Configure PHPStan (Optional)
+### Step 3: Configure PHPStan (Optional)
 
 The extension includes PHPStan integration. It's automatically registered via `phpstan/extension-installer`.
 

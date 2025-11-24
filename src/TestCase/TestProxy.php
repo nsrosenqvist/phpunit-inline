@@ -62,6 +62,48 @@ final class TestProxy
     }
 
     /**
+     * Magic method to get properties from the instance.
+     */
+    public function __get(string $name): mixed
+    {
+        $instanceClass = get_class($this->instance);
+        $reflection = new \ReflectionClass($instanceClass);
+
+        if ($reflection->hasProperty($name)) {
+            $property = $reflection->getProperty($name);
+            $property->setAccessible(true);
+            return $property->getValue($this->instance);
+        }
+
+        throw new \RuntimeException(
+            sprintf(
+                'Property %s does not exist on %s',
+                $name,
+                $instanceClass
+            )
+        );
+    }
+
+    /**
+     * Magic method to set properties on the instance.
+     */
+    public function __set(string $name, mixed $value): void
+    {
+        $instanceClass = get_class($this->instance);
+        $reflection = new \ReflectionClass($instanceClass);
+
+        if ($reflection->hasProperty($name)) {
+            $property = $reflection->getProperty($name);
+            $property->setAccessible(true);
+            $property->setValue($this->instance, $value);
+            return;
+        }
+
+        // If property doesn't exist, create it dynamically on the instance
+        $this->instance->$name = $value;
+    }
+
+    /**
      * Execute the test method by manually parsing and executing it.
      *
      * @param array<mixed> $args Arguments to pass to the test method
