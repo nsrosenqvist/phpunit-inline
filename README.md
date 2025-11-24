@@ -5,18 +5,24 @@ A PHPUnit extension that enables writing tests inline with your application code
 ## Features
 
 - ✅ Write tests directly in your application classes using `#[Test]` attribute
+- ✅ **Function-based tests** - Write tests as standalone functions (Rust-style)
+- ✅ **Namespace-based test organization** - Group tests in `Tests` namespaces
 - ✅ Access both private/protected class methods AND PHPUnit assertions
 - ✅ Full compatibility with PHPUnit's mocking and assertion features
+- ✅ **Data providers** - Works with both class methods and functions
+- ✅ **Lifecycle methods** - `#[Before]`, `#[After]`, `#[BeforeClass]`, `#[AfterClass]`
 - ✅ PHPStan integration to prevent false positives
 - ✅ Configurable directory scanning
 - ✅ PSR-12 compliant with strict types
-- ✅ No custom attributes needed - uses PHPUnit's built-in `#[Test]` attribute
+- ✅ No custom attributes needed - uses PHPUnit's built-in attributes
 
 ## Why Inline Tests?
 
 Inspired by Rust's `#[test]` attribute, this extension allows you to:
 - Keep tests close to the code they test
 - Test private/protected methods without reflection hacks
+- Write tests as simple functions or class methods
+- Organize tests using namespaces (like Rust's `mod tests`)
 - Maintain a clear separation between unit tests and integration tests
 - Reduce context switching when developing
 
@@ -89,6 +95,10 @@ The extension includes PHPStan integration. It's automatically registered via `p
 
 ## Usage
 
+### Class-Based Tests
+
+Write tests as methods within your application classes:
+
 ```php
 <?php
 
@@ -154,20 +164,136 @@ final class Calculator
 }
 ```
 
+### Function-Based Tests
+
+Write tests as standalone functions - perfect for testing pure functions or utility code:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Math;
+
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\DataProvider;
+
+// Production functions
+function add(int $a, int $b): int
+{
+    return $a + $b;
+}
+
+function multiply(int $a, int $b): int
+{
+    return $a * $b;
+}
+
+// Tests namespace - Rust-style mod tests pattern
+namespace App\Math\Tests;
+
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\DataProvider;
+use function App\Math\add;
+use function App\Math\multiply;
+
+#[Test]
+function testAdd(): void
+{
+    $result = add(2, 3);
+    $this->assertEquals(5, $result); // $this has access to PHPUnit assertions!
+}
+
+#[Test]
+function testMultiply(): void
+{
+    $result = multiply(4, 5);
+    $this->assertEquals(20, $result);
+}
+
+#[Test]
+#[DataProvider('additionDataProvider')]
+function testAddWithDataProvider(int $a, int $b, int $expected): void
+{
+    $result = add($a, $b);
+    $this->assertEquals($expected, $result);
+}
+
+function additionDataProvider(): array
+{
+    return [
+        [1, 2, 3],
+        [5, 5, 10],
+        [10, -5, 5],
+    ];
+}
+```
+
+### Namespace-Based Test Organization
+
+Organize tests in a `Tests` namespace within your module (Rust-style):
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use PHPUnit\Framework\Attributes\Test;
+
+class UserService
+{
+    public function createUser(string $email): User
+    {
+        // ... implementation
+    }
+}
+
+// Tests in a sub-namespace
+namespace App\Services\Tests;
+
+use App\Services\User;
+use App\Services\UserService;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\Before;
+
+class UserServiceTest
+{
+    private UserService $service;
+
+    #[Before]
+    public function createService(): void
+    {
+        $this->service = new UserService();
+    }
+
+    #[Test]
+    public function testCreateUser(): void
+    {
+        $user = $this->service->createUser('test@example.com');
+        $this->assertInstanceOf(User::class, $user);
+        $this->assertEquals('test@example.com', $user->email);
+    }
+}
+```
+
 ## How It Works
 
 The extension works through several components:
 
-1. **Scanner**: Scans configured directories for classes with `#[Test]` attributes
-2. **Test Wrapper**: Creates dynamic TestCase instances that wrap your application classes
-3. **Test Proxy**: Routes method calls to either:
-   - Your class instance (for testing private/protected methods)
-   - PHPUnit's TestCase (for assertions, mocking, etc.)
-4. **PHPStan Integration**: Understands the dual context and prevents false positives
+1. **Scanner**: Scans configured directories for classes and functions with `#[Test]` attributes
+2. **Autoloader**: Custom autoloader for namespace-based tests that don't follow PSR-4
+3. **Test Generator**: Creates dynamic TestCase instances that wrap your classes or functions
+4. **Context Binding**: Routes method calls appropriately:
+   - Class methods → Your class instance (for testing private/protected methods)
+   - Function bodies → Bound with TestCase context (for assertions)
+   - PHPUnit assertions → TestCase methods (assertEquals, assertInstanceOf, etc.)
+5. **PHPStan Integration**: Understands the dual context and prevents false positives
 
 ### Behind the Scenes
 
-When you write:
+**For class-based tests:**
 ```php
 #[Test]
 private function testMultiply(): void
@@ -179,10 +305,27 @@ private function testMultiply(): void
 
 The extension:
 1. Discovers this method during test scanning
-2. Creates an `InlineTestCase` wrapper
-3. Provides a `TestProxy` that makes `$this->multiply()` route to your class
-4. Makes `$this->assertEquals()` route to PHPUnit's assertion methods
-5. Executes the test with full PHPUnit features
+2. Creates a dynamic `TestCase` wrapper class
+3. Routes `$this->multiply()` to your class instance
+4. Routes `$this->assertEquals()` to PHPUnit's assertion methods
+5. Executes with full PHPUnit features
+
+**For function-based tests:**
+```php
+#[Test]
+function testAdd(): void
+{
+    $result = add(2, 3);
+    $this->assertEquals(5, $result);  // $this magically works in functions!
+}
+```
+
+The extension:
+1. Discovers functions with `#[Test]` attribute
+2. Groups functions by namespace
+3. Creates a dynamic `TestCase` class for each namespace
+4. Binds each function body to the TestCase context using closures
+5. Makes `$this` available inside functions for PHPUnit assertions
 
 ## Comparison with Traditional Tests
 
@@ -291,12 +434,117 @@ final class OrderProcessor
 
 See `examples/OrderProcessor.php` for a complete example.
 
+## Lifecycle Methods and Data Providers
+
+### Lifecycle Methods
+
+All PHPUnit lifecycle attributes work with both class-based and function-based tests:
+
+```php
+namespace App\Database\Tests;
+
+use PHPUnit\Framework\Attributes\{Test, Before, After, BeforeClass, AfterClass};
+
+class DatabaseTest
+{
+    private static $connection;
+    private $transaction;
+
+    #[BeforeClass]
+    public static function setupDatabase(): void
+    {
+        self::$connection = new DatabaseConnection();
+    }
+
+    #[Before]
+    public function startTransaction(): void
+    {
+        $this->transaction = self::$connection->beginTransaction();
+    }
+
+    #[Test]
+    public function testInsert(): void
+    {
+        // Test runs within transaction
+    }
+
+    #[After]
+    public function rollbackTransaction(): void
+    {
+        $this->transaction->rollback();
+    }
+
+    #[AfterClass]
+    public static function closeDatabase(): void
+    {
+        self::$connection->close();
+    }
+}
+```
+
+### Data Providers
+
+Data providers work with both class methods and functions:
+
+**Class-based:**
+```php
+class MathTest
+{
+    #[Test]
+    #[DataProvider('additionProvider')]
+    public function testAddition(int $a, int $b, int $expected): void
+    {
+        $this->assertEquals($expected, $a + $b);
+    }
+
+    public static function additionProvider(): array
+    {
+        return [
+            [1, 1, 2],
+            [2, 3, 5],
+            [10, 5, 15],
+        ];
+    }
+}
+```
+
+**Function-based:**
+```php
+namespace App\Utils\Tests;
+
+use PHPUnit\Framework\Attributes\{Test, DataProvider};
+
+#[Test]
+#[DataProvider('stringCases')]
+function testStringManipulation(string $input, string $expected): void
+{
+    $result = manipulate($input);
+    $this->assertEquals($expected, $result);
+}
+
+function stringCases(): array
+{
+    return [
+        ['hello', 'HELLO'],
+        ['world', 'WORLD'],
+    ];
+}
+```
+
 ## Best Practices
 
-1. **Use for unit tests only**: Inline tests are perfect for testing individual class methods
-2. **Keep integration tests separate**: Use traditional test files for integration tests
-3. **Test private implementation details**: This is where inline tests shine
-4. **Don't overuse**: Not every class needs inline tests - use judgment
+1. **Choose the right style**:
+   - **Class-based inline tests**: For testing private/protected methods of a specific class
+   - **Function-based tests**: For testing pure functions and utilities
+   - **Namespace-based organization**: For grouping related tests together (Rust-style)
+   - **Traditional test files**: For integration tests and complex test scenarios
+
+2. **Use for unit tests**: Inline tests are perfect for testing individual units of code
+3. **Keep integration tests separate**: Use traditional test files in `tests/` directory
+4. **Test private implementation details**: This is where inline tests shine - no reflection needed!
+5. **Leverage lifecycle methods**: Use `#[Before]`, `#[After]` etc. for setup/teardown
+6. **Use data providers**: Avoid repetitive test code with `#[DataProvider]`
+7. **Don't overuse**: Not every class needs inline tests - use judgment
 
 ## Requirements
 
@@ -306,10 +554,12 @@ See `examples/OrderProcessor.php` for a complete example.
 ## Contributing
 
 Contributions are welcome! Please ensure:
-- All code follows PSR-12
-- Every file has `declare(strict_types=1)` 
-- Tests pass with PHPUnit
-- Code passes PHPStan analysis at max level
+
+1. **Code quality**: All code follows PSR-12 with `declare(strict_types=1)`
+2. **Run checks**: `composer check` - runs tests, formatting, and static analysis
+3. **Auto-fix formatting**: `composer format` (if needed)
+
+The `composer check` command verifies everything before submitting a PR.
 
 ## License
 

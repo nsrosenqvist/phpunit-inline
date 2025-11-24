@@ -281,23 +281,36 @@ final class InlineTestAutoloader
             return $autoloader;
         }
 
-        $composerData = json_decode(file_get_contents($composerJsonPath), true);
+        $composerJson = file_get_contents($composerJsonPath);
+        if ($composerJson === false) {
+            return $autoloader;
+        }
+
+        $composerData = json_decode($composerJson, true);
 
         if (!is_array($composerData)) {
             return $autoloader;
         }
 
         // Register autoload PSR-4 namespaces
-        if (isset($composerData['autoload']['psr-4']) && is_array($composerData['autoload']['psr-4'])) {
+        if (isset($composerData['autoload']) && is_array($composerData['autoload'])
+            && isset($composerData['autoload']['psr-4']) && is_array($composerData['autoload']['psr-4'])) {
             foreach ($composerData['autoload']['psr-4'] as $namespace => $path) {
+                if (!is_string($path)) {
+                    continue;
+                }
                 $baseDir = dirname($composerJsonPath) . DIRECTORY_SEPARATOR . trim($path, '/');
                 $autoloader->addNamespace($namespace, $baseDir);
             }
         }
 
         // Also register autoload-dev PSR-4 namespaces
-        if (isset($composerData['autoload-dev']['psr-4']) && is_array($composerData['autoload-dev']['psr-4'])) {
+        if (isset($composerData['autoload-dev']) && is_array($composerData['autoload-dev'])
+            && isset($composerData['autoload-dev']['psr-4']) && is_array($composerData['autoload-dev']['psr-4'])) {
             foreach ($composerData['autoload-dev']['psr-4'] as $namespace => $path) {
+                if (!is_string($path)) {
+                    continue;
+                }
                 $baseDir = dirname($composerJsonPath) . DIRECTORY_SEPARATOR . trim($path, '/');
                 $autoloader->addNamespace($namespace, $baseDir);
             }

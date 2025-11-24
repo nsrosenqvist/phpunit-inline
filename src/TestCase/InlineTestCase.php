@@ -62,15 +62,21 @@ final class InlineTestCase extends TestCase
             // Register BeforeClass and AfterClass callbacks
             foreach ($testClass->getBeforeClassMethods() as $method) {
                 self::$beforeClassCallbacks[] = function () use ($method) {
-                    $method->setAccessible(true);
-                    $method->invoke(null);
+                    if ($method instanceof \ReflectionMethod) {
+                        $method->setAccessible(true);
+                        $method->invoke(null);
+                    }
+                    // ReflectionFunction doesn't need setAccessible
                 };
             }
 
             foreach ($testClass->getAfterClassMethods() as $method) {
                 self::$afterClassCallbacks[] = function () use ($method) {
-                    $method->setAccessible(true);
-                    $method->invoke(null);
+                    if ($method instanceof \ReflectionMethod) {
+                        $method->setAccessible(true);
+                        $method->invoke(null);
+                    }
+                    // ReflectionFunction doesn't need setAccessible
                 };
             }
         }
@@ -141,8 +147,11 @@ final class InlineTestCase extends TestCase
 
         // Execute Before methods on the instance
         foreach ($this->testClass->getBeforeMethods() as $method) {
-            $method->setAccessible(true);
-            $method->invoke($this->instance);
+            if ($method instanceof \ReflectionMethod) {
+                $method->setAccessible(true);
+                $method->invoke($this->instance);
+            }
+            // ReflectionFunction doesn't need setAccessible
         }
     }
 
@@ -151,8 +160,11 @@ final class InlineTestCase extends TestCase
         // Execute After methods on the instance
         if (isset($this->instance) && isset($this->testClass)) {
             foreach ($this->testClass->getAfterMethods() as $method) {
-                $method->setAccessible(true);
-                $method->invoke($this->instance);
+                if ($method instanceof \ReflectionMethod) {
+                    $method->setAccessible(true);
+                    $method->invoke($this->instance);
+                }
+                // ReflectionFunction doesn't need setAccessible
             }
         }
 

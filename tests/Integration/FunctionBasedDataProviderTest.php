@@ -36,11 +36,11 @@ final class FunctionBasedDataProviderTest extends TestCase
         self::assertCount(1, $tests, 'Should have 1 test suite');
 
         $functionSuite = $tests[0];
-        
+
         // With data provider, we should have 3 test cases (one for each data set)
         // In PHPUnit 12, the suite structure may be different - let's check what we get
         $testCount = count($functionSuite->tests());
-        
+
         // If we only get 1 test, it might be that PHPUnit hasn't expanded the data provider yet
         // This is actually expected - data providers are expanded at runtime, not during suite building
         // So we should expect 1 test method that will be run 3 times
