@@ -5,19 +5,41 @@
 
 A PHPUnit extension that enables writing tests inline with your application code using PHPUnit's native `#[Test]` attribute, inspired by Rust's testing approach.
 
+## Table of Contents
+
+- [Features](#features)
+- [Why Inline Tests?](#why-inline-tests)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Use Cases](#use-cases)
+  - [1. Inline Tests Inside a Class](#1-inline-tests-inside-a-class)
+  - [2. Tests in a Sub-Namespace (Rust-style)](#2-tests-in-a-sub-namespace-rust-style)
+  - [3. Tests for Helper Functions](#3-tests-for-helper-functions)
+- [The test() Helper Function](#the-test-helper-function)
+- [Factory Methods](#factory-methods)
+- [Lifecycle Methods](#lifecycle-methods)
+- [Data Providers](#data-providers)
+- [Mocking Support](#mocking-support)
+- [PHPStan Integration](#phpstan-integration)
+- [Stripping Tests for Production](#stripping-tests-for-production)
+- [Best Practices](#best-practices)
+- [Requirements](#requirements)
+- [Contributing](#contributing)
+
 ## Features
 
 - ✅ Write tests directly in your application classes using `#[Test]` attribute
 - ✅ **Function-based tests** - Write tests as standalone functions (Rust-style)
-- ✅ **Namespace-based test organization** - Group tests in `Tests` namespaces
-- ✅ Access both private/protected class methods AND PHPUnit assertions
+- ✅ **Namespace-based test organization** - Group tests in `\Tests` sub-namespaces
+- ✅ **Factory methods** - Use `#[Factory]` and `#[DefaultFactory]` for classes with constructor arguments
+- ✅ Access private/protected class methods directly - no reflection hacks
 - ✅ Full compatibility with PHPUnit's mocking and assertion features
 - ✅ **Data providers** - Works with both class methods and functions
 - ✅ **Lifecycle methods** - `#[Before]`, `#[After]`, `#[BeforeClass]`, `#[AfterClass]`
+- ✅ **Test stripping** - Remove inline tests for production builds
 - ✅ PHPStan integration to prevent false positives
 - ✅ Configurable directory scanning
 - ✅ PSR-12 compliant with strict types
-- ✅ No custom attributes needed - uses PHPUnit's built-in attributes
 
 ## Why Inline Tests?
 
@@ -35,97 +57,81 @@ Inspired by Rust's `#[test]` attribute, this extension allows you to:
 composer require --dev nsrosenqvist/phpunit-inline
 ```
 
-## Configuration
+## Quick Start
 
-### Step 1: Configure PHPUnit Bootstrap
+Here's a minimal example to get you started:
 
-For **namespace-based tests** (Rust-style `mod tests` pattern), you need to register the custom autoloader.
+```php
+<?php
 
-Update your `phpunit.xml` bootstrap:
+declare(strict_types=1);
+
+namespace App;
+
+use PHPUnit\Framework\Attributes\Test;
+
+class Calculator
+{
+    public function add(int $a, int $b): int
+    {
+        return $a + $b;
+    }
+
+    #[Test]
+    private function testAdd(): void
+    {
+        test()->assertEquals(5, $this->add(2, 3));
+    }
+}
+```
+
+Run your tests with the provided CLI wrapper:
+
+```bash
+# Scan specific directories for inline tests
+./vendor/bin/phpunit-inline --scan-directories=src
+
+# Scan multiple directories
+./vendor/bin/phpunit-inline --scan-directories=src,app
+
+# Pass any PHPUnit options
+./vendor/bin/phpunit-inline --scan-directories=src --testdox --colors=always
+```
+
+### Namespace-Based Tests Setup
+
+For **namespace-based tests** (Rust-style `mod tests` pattern), you need to register the custom autoloader. Create or update your PHPUnit bootstrap file:
+
+```php
+<?php
+// tests/bootstrap.php
+
+require_once __DIR__ . '/../vendor/autoload.php';
+
+// Register inline test autoloader for namespace-based tests
+use NSRosenqvist\PHPUnitInline\Autoloader\InlineTestAutoloader;
+
+$autoloader = InlineTestAutoloader::fromComposerJson(__DIR__ . '/../composer.json');
+$autoloader->register();
+```
+
+Then reference it in your `phpunit.xml`:
 
 ```xml
-<phpunit bootstrap="vendor/nsrosenqvist/phpunit-inline/src/bootstrap.php">
+<phpunit bootstrap="tests/bootstrap.php">
     <!-- ... -->
 </phpunit>
 ```
 
-If you already have a custom bootstrap file, add this at the top:
+## Use Cases
 
-```php
-<?php
-// Load Composer autoloader
-require_once __DIR__ . '/vendor/autoload.php';
+This extension supports three main patterns for organizing inline tests. Choose the one that best fits your needs.
 
-// Register inline test autoloader
-use NSRosenqvist\PHPUnitInline\Autoloader\InlineTestAutoloader;
+### 1. Inline Tests Inside a Class
 
-$autoloader = InlineTestAutoloader::fromComposerJson(__DIR__ . '/composer.json');
-$autoloader->register();
+**Best for**: Testing private/protected methods of a class without reflection.
 
-// ... rest of your bootstrap code
-```
-
-### Step 2: Configure the Extension
-
-Add the extension to your `phpunit.xml`:
-
-```xml
-<phpunit>
-    <!-- ... other configuration ... -->
-    
-    <extensions>
-        <bootstrap class="NSRosenqvist\PHPUnitInline\Extension\InlineTestExtension">
-            <parameter name="scanDirectories" value="src,app"/>
-        </bootstrap>
-    </extensions>
-    
-    <testsuites>
-        <testsuite name="Inline Tests">
-            <file>vendor/nsrosenqvist/phpunit-inline/tests/InlineTestsSuite.php</file>
-        </testsuite>
-        
-        <!-- Your regular test suites -->
-        <testsuite name="Unit">
-            <directory>tests/Unit</directory>
-        </testsuite>
-    </testsuites>
-</phpunit>
-```
-
-### Step 3: Configure PHPStan (Optional)
-
-The extension includes PHPStan integration. It's automatically registered via `phpstan/extension-installer`.
-
-## Usage
-
-### The `test()` Helper Function
-
-The extension provides a global `test()` function for accessing PHPUnit assertions. This creates a clear separation:
-- **`$this`** - Refers to your class instance (access private/protected methods and properties)
-- **`test()`** - Returns the PHPUnit TestCase (use for assertions, mocking, etc.)
-
-```php
-#[Test]
-private function testSomething(): void
-{
-    $result = $this->privateMethod();    // Class method
-    test()->assertEquals(5, $result);    // PHPUnit assertion
-    test()->assertTrue($result > 0);     // Another assertion
-    
-    $mock = test()->createMock(Foo::class);  // Create mocks
-    test()->expectException(\Exception::class);  // Exception testing
-}
-```
-
-This design:
-- Makes it explicit which context you're using
-- Works identically for class-based and function-based tests
-- Avoids confusing `$this` semantics in functions
-- Provides full IDE autocompletion on `test()->`
-
-### Class-Based Tests
-
-Write tests as methods within your application classes:
+Write tests directly inside the class they're testing. The `$this` variable refers to your class instance, giving you direct access to private and protected methods.
 
 ```php
 <?php
@@ -135,6 +141,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\TestDox;
 
 final class Calculator
 {
@@ -148,53 +155,136 @@ final class Calculator
         return $a * $b;
     }
 
-    protected function divide(int $a, int $b): int
-    {
-        if ($b === 0) {
-            throw new \InvalidArgumentException('Cannot divide by zero');
-        }
-        return intdiv($a, $b);
-    }
-
     // ==================== Inline Tests ====================
 
     #[Test]
+    #[TestDox('Adding two numbers returns their sum')]
     private function testAdd(): void
     {
-        // $this refers to the class instance, test() provides PHPUnit assertions
+        // $this refers to the Calculator instance
         $result = $this->add(2, 3);
+        
+        // test() provides PHPUnit assertions
         test()->assertEquals(5, $result);
     }
 
     #[Test]
+    #[TestDox('Can test private multiply method directly')]
     private function testMultiplyPrivateMethod(): void
     {
-        // Can access private methods directly - no reflection needed!
+        // Direct access to private methods - no reflection needed!
         $result = $this->multiply(4, 5);
         test()->assertEquals(20, $result);
     }
 
     #[Test]
-    protected function testDivideByZeroThrowsException(): void
+    private function testWithMocking(): void
     {
-        // Full PHPUnit feature support including exception testing
-        test()->expectException(\InvalidArgumentException::class);
-        $this->divide(10, 0);
-    }
-
-    #[Test]
-    private function testCanUseMocking(): void
-    {
-        // Even mocking works!
+        // Full PHPUnit mocking support
         $mock = test()->createMock(\stdClass::class);
         test()->assertInstanceOf(\stdClass::class, $mock);
     }
 }
 ```
 
-### Function-Based Tests
+**Output:**
+```
+Calculator (App\Services\Calculator)
+ ✔ Adding two numbers returns their sum
+ ✔ Can test private multiply method directly
+ ✔ With mocking
+```
 
-Write tests as standalone functions - perfect for testing pure functions or utility code:
+### 2. Tests in a Sub-Namespace (Rust-style)
+
+**Best for**: Keeping tests separate from production code but in the same file, similar to Rust's `mod tests` pattern.
+
+Place your tests in a `\Tests` sub-namespace within the same file. This is the cleanest separation while still co-locating tests with the code.
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+class UserService
+{
+    public function __construct(
+        private UserRepository $repository,
+        private EmailService $emailService,
+    ) {}
+
+    public function createUser(string $email, string $name): User
+    {
+        $user = new User($email, $name);
+        $this->repository->save($user);
+        $this->emailService->sendWelcome($user);
+        return $user;
+    }
+
+    public function findByEmail(string $email): ?User
+    {
+        return $this->repository->findByEmail($email);
+    }
+}
+
+// ==================== Tests ====================
+
+namespace App\Services\Tests;
+
+use App\Services\UserService;
+use App\Services\UserRepository;
+use App\Services\EmailService;
+use App\Services\User;
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\Before;
+use PHPUnit\Framework\Attributes\TestDox;
+
+class UserServiceTest
+{
+    private UserService $service;
+    private UserRepository $repository;
+    private EmailService $emailService;
+
+    #[Before]
+    public function setUp(): void
+    {
+        $this->repository = test()->createMock(UserRepository::class);
+        $this->emailService = test()->createMock(EmailService::class);
+        $this->service = new UserService($this->repository, $this->emailService);
+    }
+
+    #[Test]
+    #[TestDox('Creating a user saves to repository and sends welcome email')]
+    public function testCreateUser(): void
+    {
+        $this->repository->expects(test()->once())
+            ->method('save');
+
+        $this->emailService->expects(test()->once())
+            ->method('sendWelcome');
+
+        $user = $this->service->createUser('john@example.com', 'John Doe');
+
+        test()->assertInstanceOf(User::class, $user);
+        test()->assertEquals('john@example.com', $user->getEmail());
+    }
+
+    #[Test]
+    public function testFindByEmailReturnsNullWhenNotFound(): void
+    {
+        $this->repository->method('findByEmail')
+            ->willReturn(null);
+
+        $result = $this->service->findByEmail('unknown@example.com');
+
+        test()->assertNull($result);
+    }
+}
+```
+
+**You can also use functions instead of a class:**
 
 ```php
 <?php
@@ -203,10 +293,6 @@ declare(strict_types=1);
 
 namespace App\Math;
 
-use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\Attributes\DataProvider;
-
-// Production functions
 function add(int $a, int $b): int
 {
     return $a + $b;
@@ -217,7 +303,8 @@ function multiply(int $a, int $b): int
     return $a * $b;
 }
 
-// Tests namespace - Rust-style mod tests pattern
+// ==================== Tests ====================
+
 namespace App\Math\Tests;
 
 use PHPUnit\Framework\Attributes\Test;
@@ -228,38 +315,149 @@ use function App\Math\multiply;
 #[Test]
 function testAdd(): void
 {
-    $result = add(2, 3);
-    test()->assertEquals(5, $result); // test() provides PHPUnit assertions
+    test()->assertEquals(5, add(2, 3));
 }
 
 #[Test]
 function testMultiply(): void
 {
-    $result = multiply(4, 5);
-    test()->assertEquals(20, $result);
+    test()->assertEquals(20, multiply(4, 5));
 }
 
 #[Test]
-#[DataProvider('additionDataProvider')]
+#[DataProvider('additionCases')]
 function testAddWithDataProvider(int $a, int $b, int $expected): void
 {
-    $result = add($a, $b);
-    test()->assertEquals($expected, $result);
+    test()->assertEquals($expected, add($a, $b));
 }
 
-function additionDataProvider(): array
+function additionCases(): array
 {
     return [
-        [1, 2, 3],
-        [5, 5, 10],
-        [10, -5, 5],
+        'positive numbers' => [2, 3, 5],
+        'with zero' => [5, 0, 5],
+        'negative numbers' => [-2, -3, -5],
     ];
 }
 ```
 
-### Namespace-Based Test Organization
+### 3. Tests for Helper Functions
 
-Organize tests in a `Tests` namespace within your module (Rust-style):
+**Best for**: Testing functions in helper files where creating a namespace feels like overkill.
+
+When you have a file with utility functions (like `helpers.php`), you can write tests in the same namespace, right next to the functions. The generated test class name is derived from the filename (e.g., `helpers.php` → `HelpersTest`).
+
+```php
+<?php
+// src/helpers.php
+
+declare(strict_types=1);
+
+namespace App;
+
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\DataProvider;
+
+// ==================== Helper Functions ====================
+
+function formatCurrency(float $amount, string $currency = 'USD'): string
+{
+    return match ($currency) {
+        'USD' => '$' . number_format($amount, 2),
+        'EUR' => '€' . number_format($amount, 2, ',', '.'),
+        'GBP' => '£' . number_format($amount, 2),
+        default => number_format($amount, 2) . ' ' . $currency,
+    };
+}
+
+function slugify(string $text): string
+{
+    $text = preg_replace('~[^\pL\d]+~u', '-', $text);
+    $text = trim($text, '-');
+    $text = strtolower($text);
+    return preg_replace('~-+~', '-', $text);
+}
+
+// ==================== Tests ====================
+
+#[Test]
+function testFormatCurrencyUSD(): void
+{
+    test()->assertEquals('$1,234.56', formatCurrency(1234.56));
+    test()->assertEquals('$0.00', formatCurrency(0));
+}
+
+#[Test]
+function testFormatCurrencyEUR(): void
+{
+    test()->assertEquals('€1.234,56', formatCurrency(1234.56, 'EUR'));
+}
+
+#[Test]
+#[DataProvider('slugifyProvider')]
+function testSlugify(string $input, string $expected): void
+{
+    test()->assertEquals($expected, slugify($input));
+}
+
+function slugifyProvider(): array
+{
+    return [
+        ['Hello World', 'hello-world'],
+        ['PHP is GREAT!!!', 'php-is-great'],
+        ['Multiple   Spaces', 'multiple-spaces'],
+    ];
+}
+```
+
+**Output:**
+```
+HelpersTest (App\HelpersTest)
+ ✔ Format currency USD
+ ✔ Format currency EUR
+ ✔ Slugify with data set "Hello World"
+ ✔ Slugify with data set "PHP is GREAT!!!"
+ ✔ Slugify with data set "Multiple   Spaces"
+```
+
+## The test() Helper Function
+
+The `test()` function is a global helper that provides access to PHPUnit assertions from within inline tests. This creates a clear separation of concerns:
+
+| Context | Access |
+|---------|--------|
+| `$this` | Your class instance (private/protected methods and properties) |
+| `test()` | PHPUnit TestCase (assertions, mocking, expectations) |
+
+```php
+#[Test]
+private function testExample(): void
+{
+    // Access class methods via $this
+    $result = $this->privateMethod();
+    
+    // Access PHPUnit via test()
+    test()->assertEquals(42, $result);
+    test()->assertTrue($result > 0);
+    test()->assertCount(3, $this->items);
+    
+    // Mocking
+    $mock = test()->createMock(SomeInterface::class);
+    $mock->expects(test()->once())->method('doSomething');
+    
+    // Exception testing
+    test()->expectException(\InvalidArgumentException::class);
+    test()->expectExceptionMessage('Invalid input');
+}
+```
+
+**Note:** In function-based tests, `$this` is not available. Only use `test()` for assertions.
+
+## Factory Methods
+
+For classes that require constructor arguments, use factory methods to create instances for testing.
+
+### Basic Factory
 
 ```php
 <?php
@@ -269,309 +467,358 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PHPUnit\Framework\Attributes\Test;
+use NSRosenqvist\PHPUnitInline\Attributes\Factory;
 
-class UserService
-{
-    public function createUser(string $email): User
-    {
-        // ... implementation
-    }
-}
-
-// Tests in a sub-namespace
-namespace App\Services\Tests;
-
-use App\Services\User;
-use App\Services\UserService;
-use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\Attributes\Before;
-
-class UserServiceTest
-{
-    private UserService $service;
-
-    #[Before]
-    public function createService(): void
-    {
-        $this->service = new UserService();
-    }
-
-    #[Test]
-    public function testCreateUser(): void
-    {
-        $user = $this->service->createUser('test@example.com');
-        test()->assertInstanceOf(User::class, $user);
-        test()->assertEquals('test@example.com', $user->email);
-    }
-}
-```
-
-## How It Works
-
-The extension works through several components:
-
-1. **Scanner**: Scans configured directories for classes and functions with `#[Test]` attributes
-2. **Autoloader**: Custom autoloader for namespace-based tests that don't follow PSR-4
-3. **Test Generator**: Creates dynamic TestCase instances that wrap your classes or functions
-4. **Context Binding**: Routes method calls appropriately:
-   - Class methods → Your class instance (for testing private/protected methods)
-   - `test()` helper → PHPUnit TestCase (for assertions like assertEquals, assertInstanceOf)
-5. **PHPStan Integration**: Understands the test() helper and prevents false positives
-
-### Behind the Scenes
-
-**For class-based tests:**
-```php
-#[Test]
-private function testMultiply(): void
-{
-    $result = $this->multiply(4, 5);  // Calls private method on class
-    test()->assertEquals(20, $result);  // Calls PHPUnit assertion
-}
-```
-
-The extension:
-1. Discovers this method during test scanning
-2. Creates a dynamic `TestCase` wrapper class
-3. Routes `$this->multiply()` to your class instance
-4. Routes `test()->assertEquals()` to PHPUnit's assertion methods
-5. Executes with full PHPUnit features
-
-**For function-based tests:**
-```php
-#[Test]
-function testAdd(): void
-{
-    $result = add(2, 3);
-    test()->assertEquals(5, $result);  // test() provides PHPUnit assertions
-}
-```
-
-The extension:
-1. Discovers functions with `#[Test]` attribute
-2. Groups functions by namespace
-3. Creates a dynamic `TestCase` class for each namespace
-4. Sets up the `test()` helper to provide access to PHPUnit assertions
-5. Calls the test function directly
-
-## Comparison with Traditional Tests
-
-### Traditional Approach
-```php
-// src/Calculator.php
-class Calculator {
-    private function multiply(int $a, int $b): int { 
-        return $a * $b; 
-    }
-}
-
-// tests/CalculatorTest.php
-class CalculatorTest extends TestCase {
-    public function testMultiply(): void {
-        $calc = new Calculator();
-        $reflection = new ReflectionMethod($calc, 'multiply');
-        $reflection->setAccessible(true);
-        $result = $reflection->invoke($calc, 4, 5);
-        $this->assertEquals(20, $result);
-    }
-}
-```
-
-### With Inline Tests
-```php
-// src/Calculator.php
-class Calculator {
-    private function multiply(int $a, int $b): int { 
-        return $a * $b; 
-    }
-    
-    #[Test]
-    private function testMultiply(): void {
-        test()->assertEquals(20, $this->multiply(4, 5));
-    }
-}
-```
-
-## Mocking Support
-
-**Yes!** Full PHPUnit mocking support works with inline tests. You can use:
-- `createMock()` - Full mock objects with expectations
-- `createStub()` - Simple stubs with return values
-- `createPartialMock()` - Partial mocks
-- All PHPUnit mock configuration methods
-
-### Example with Mocking
-
-```php
-final class OrderProcessor
+class OrderProcessor
 {
     public function __construct(
         private PaymentGateway $paymentGateway,
-        private EmailService $emailService
+        private InventoryService $inventory,
     ) {}
 
-    public function processOrder(Order $order): bool
+    public function process(Order $order): bool
     {
-        $paymentResult = $this->paymentGateway->charge($order->getAmount());
-        
-        if ($paymentResult) {
-            $this->emailService->sendConfirmation($order->getCustomerEmail());
-        }
-        
-        return $paymentResult;
+        // ... implementation
     }
 
-    #[Test]
-    private function testProcessOrderWithMocks(): void
+    // ==================== Test Support ====================
+
+    #[Factory]
+    private static function createForTesting(): self
     {
-        // Create mocks with expectations
-        $paymentGateway = test()->createMock(PaymentGateway::class);
-        $paymentGateway->expects(test()->once())
-            ->method('charge')
-            ->with(100.00)
-            ->willReturn(true);
+        return new self(
+            new MockPaymentGateway(),
+            new MockInventoryService(),
+        );
+    }
 
-        $emailService = test()->createMock(EmailService::class);
-        $emailService->expects(test()->once())
-            ->method('sendConfirmation');
+    // ==================== Tests ====================
 
-        // Test with mocked dependencies
-        $processor = new OrderProcessor($paymentGateway, $emailService);
-        $order = new Order(100.00, 'test@example.com');
+    #[Test]
+    private function testProcessOrder(): void
+    {
+        // $this is an instance created by createForTesting()
+        $order = new Order(100.00, ['item1', 'item2']);
         
-        $result = $processor->processOrder($order);
+        $result = $this->process($order);
         
         test()->assertTrue($result);
-    }
-
-    #[Test]
-    private function testWithStubs(): void
-    {
-        // Stubs are simpler - no expectations
-        $paymentStub = test()->createStub(PaymentGateway::class);
-        $paymentStub->method('charge')->willReturn(true);
-        
-        $emailStub = test()->createStub(EmailService::class);
-        
-        $processor = new OrderProcessor($paymentStub, $emailStub);
-        // ... rest of test
     }
 }
 ```
 
-See `examples/OrderProcessor.php` for a complete example.
+### Multiple Factories
 
-## Lifecycle Methods and Data Providers
-
-### Lifecycle Methods
-
-All PHPUnit lifecycle attributes work with both class-based and function-based tests:
+Use `#[Factory('name')]` to specify which factory to use, and `#[DefaultFactory]` to set the default:
 
 ```php
-namespace App\Database\Tests;
+<?php
 
-use PHPUnit\Framework\Attributes\{Test, Before, After, BeforeClass, AfterClass};
+declare(strict_types=1);
 
-class DatabaseTest
+namespace App\Services;
+
+use PHPUnit\Framework\Attributes\Test;
+use NSRosenqvist\PHPUnitInline\Attributes\Factory;
+use NSRosenqvist\PHPUnitInline\Attributes\DefaultFactory;
+
+class PaymentService
 {
-    private static $connection;
-    private $transaction;
+    public function __construct(
+        private PaymentGateway $gateway,
+        private Logger $logger,
+    ) {}
 
-    #[BeforeClass]
-    public static function setupDatabase(): void
+    public function charge(float $amount): bool
     {
-        self::$connection = new DatabaseConnection();
+        $this->logger->info("Charging {$amount}");
+        return $this->gateway->charge($amount);
     }
 
-    #[Before]
-    public function startTransaction(): void
+    // ==================== Factories ====================
+
+    #[DefaultFactory]
+    private static function createWithMocks(): self
     {
-        $this->transaction = self::$connection->beginTransaction();
+        return new self(
+            test()->createStub(PaymentGateway::class),
+            new NullLogger(),
+        );
+    }
+
+    #[Factory('withFailingGateway')]
+    private static function createWithFailingGateway(): self
+    {
+        $gateway = test()->createStub(PaymentGateway::class);
+        $gateway->method('charge')->willReturn(false);
+        
+        return new self($gateway, new NullLogger());
+    }
+
+    // ==================== Tests ====================
+
+    #[Test]
+    private function testChargeLogsAmount(): void
+    {
+        // Uses default factory (createWithMocks)
+        $this->charge(99.99);
+        test()->assertTrue(true); // Verify no exceptions
     }
 
     #[Test]
-    public function testInsert(): void
+    #[Factory('withFailingGateway')]
+    private function testChargeReturnsFalseOnGatewayFailure(): void
     {
-        // Test runs within transaction
+        // Uses the failing gateway factory
+        $result = $this->charge(50.00);
+        test()->assertFalse($result);
+    }
+}
+```
+
+## Lifecycle Methods
+
+All PHPUnit lifecycle attributes work with inline tests:
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Database\Tests;
+
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\Before;
+use PHPUnit\Framework\Attributes\After;
+use PHPUnit\Framework\Attributes\BeforeClass;
+use PHPUnit\Framework\Attributes\AfterClass;
+
+class DatabaseTest
+{
+    private static \PDO $connection;
+
+    #[BeforeClass]
+    public static function setUpDatabase(): void
+    {
+        self::$connection = new \PDO('sqlite::memory:');
+        self::$connection->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
+    }
+
+    #[Before]
+    public function beginTransaction(): void
+    {
+        self::$connection->beginTransaction();
+    }
+
+    #[Test]
+    public function testInsertUser(): void
+    {
+        self::$connection->exec("INSERT INTO users (name) VALUES ('John')");
+        
+        $count = self::$connection->query('SELECT COUNT(*) FROM users')->fetchColumn();
+        test()->assertEquals(1, $count);
     }
 
     #[After]
     public function rollbackTransaction(): void
     {
-        $this->transaction->rollback();
+        self::$connection->rollBack();
     }
 
     #[AfterClass]
-    public static function closeDatabase(): void
+    public static function tearDownDatabase(): void
     {
-        self::$connection->close();
+        self::$connection = null;
     }
 }
 ```
 
-### Data Providers
+## Data Providers
 
 Data providers work with both class methods and functions:
 
 **Class-based:**
+
 ```php
-class MathTest
+class StringUtilsTest
 {
     #[Test]
-    #[DataProvider('additionProvider')]
-    public function testAddition(int $a, int $b, int $expected): void
+    #[DataProvider('uppercaseProvider')]
+    public function testUppercase(string $input, string $expected): void
     {
-        test()->assertEquals($expected, $a + $b);
+        test()->assertEquals($expected, strtoupper($input));
     }
 
-    public static function additionProvider(): array
+    public static function uppercaseProvider(): array
     {
         return [
-            [1, 1, 2],
-            [2, 3, 5],
-            [10, 5, 15],
+            'lowercase' => ['hello', 'HELLO'],
+            'mixed case' => ['HeLLo', 'HELLO'],
+            'already uppercase' => ['HELLO', 'HELLO'],
         ];
     }
 }
 ```
 
 **Function-based:**
+
 ```php
 namespace App\Utils\Tests;
 
-use PHPUnit\Framework\Attributes\{Test, DataProvider};
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\DataProvider;
 
 #[Test]
-#[DataProvider('stringCases')]
-function testStringManipulation(string $input, string $expected): void
+#[DataProvider('trimProvider')]
+function testTrim(string $input, string $expected): void
 {
-    $result = manipulate($input);
-    test()->assertEquals($expected, $result);
+    test()->assertEquals($expected, trim($input));
 }
 
-function stringCases(): array
+function trimProvider(): array
 {
     return [
-        ['hello', 'HELLO'],
-        ['world', 'WORLD'],
+        ['  hello  ', 'hello'],
+        ["\t\nworld\t\n", 'world'],
+        ['no-spaces', 'no-spaces'],
     ];
 }
 ```
 
+## Mocking Support
+
+Full PHPUnit mocking is available through `test()`:
+
+```php
+#[Test]
+private function testWithMocks(): void
+{
+    // Create a mock with expectations
+    $userRepository = test()->createMock(UserRepository::class);
+    $userRepository->expects(test()->once())
+        ->method('find')
+        ->with(42)
+        ->willReturn(new User(42, 'John'));
+
+    // Create a stub (simpler, no expectations)
+    $logger = test()->createStub(LoggerInterface::class);
+    $logger->method('info')->willReturn(null);
+
+    // Use in your test
+    $service = new UserService($userRepository, $logger);
+    $user = $service->getUser(42);
+
+    test()->assertEquals('John', $user->getName());
+}
+```
+
+## PHPStan Integration
+
+The extension includes PHPStan integration that is automatically registered via `phpstan/extension-installer`. This prevents false positives for:
+
+- `#[Test]` methods being reported as "unused"
+- `#[Before]`, `#[After]`, `#[BeforeClass]`, `#[AfterClass]` methods being reported as "unused"
+- `#[Factory]` and `#[DefaultFactory]` methods being reported as "unused"
+- `#[DataProvider]` methods being reported as "unused"
+- Protected TestCase methods accessed via the `test()` helper
+
+No additional configuration is needed if you use `phpstan/extension-installer`.
+
+## Stripping Tests for Production
+
+Inline tests add overhead to your source files. For production deployments, you can strip all test code using the provided command.
+
+> **⚠️ Warning**: This command **permanently modifies files**. Only run this during container image builds or deployment pipelines. **Never run this on your development environment.**
+
+### Usage
+
+```bash
+# Strip tests from src/ directory
+vendor/bin/phpunit-inline-strip src/
+
+# Strip tests from multiple directories
+vendor/bin/phpunit-inline-strip src/ app/ lib/
+
+# Preview what would be removed (dry run)
+vendor/bin/phpunit-inline-strip --dry-run src/
+
+# Verbose output
+vendor/bin/phpunit-inline-strip -v src/
+```
+
+### What Gets Removed
+
+The strip command removes:
+- Methods with `#[Test]` attribute
+- Methods with `#[Before]`, `#[After]`, `#[BeforeClass]`, `#[AfterClass]` attributes
+- Methods with `#[DataProvider]` attribute (when only used by tests)
+- Methods with `#[Factory]` and `#[DefaultFactory]` attributes
+- Functions with `#[Test]` attribute
+- Entire `\Tests` sub-namespaces
+- Test-related `use` statements
+
+### Example: Docker Build
+
+```dockerfile
+FROM php:8.2-fpm
+
+# Copy source files
+COPY . /app
+
+# Install dependencies
+RUN composer install --no-dev --optimize-autoloader
+
+# Strip inline tests from production build
+RUN vendor/bin/phpunit-inline-strip src/
+
+# Continue with your build...
+```
+
+### Example: CI/CD Pipeline
+
+```yaml
+# GitHub Actions example
+deploy:
+  runs-on: ubuntu-latest
+  steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install dependencies
+      run: composer install --no-dev
+    
+    - name: Strip inline tests
+      run: vendor/bin/phpunit-inline-strip src/
+    
+    - name: Deploy
+      run: ./deploy.sh
+```
+
 ## Best Practices
 
-1. **Choose the right style**:
-   - **Class-based inline tests**: For testing private/protected methods of a specific class
-   - **Function-based tests**: For testing pure functions and utilities
-   - **Namespace-based organization**: For grouping related tests together (Rust-style)
-   - **Traditional test files**: For integration tests and complex test scenarios
+### Choosing the Right Pattern
 
-2. **Use for unit tests**: Inline tests are perfect for testing individual units of code
-3. **Keep integration tests separate**: Use traditional test files in `tests/` directory
-4. **Test private implementation details**: This is where inline tests shine - no reflection needed!
-5. **Leverage lifecycle methods**: Use `#[Before]`, `#[After]` etc. for setup/teardown
-6. **Use data providers**: Avoid repetitive test code with `#[DataProvider]`
-7. **Don't overuse**: Not every class needs inline tests - use judgment
+| Pattern | Use When |
+|---------|----------|
+| **Inline in class** | Testing private/protected methods of a specific class |
+| **Sub-namespace** | You want Rust-style `mod tests` separation |
+| **Same-namespace functions** | Testing utility functions in helper files |
+| **Traditional tests/** | Integration tests, complex test scenarios |
+
+### Recommendations
+
+1. **Keep it simple**: Don't mix patterns unnecessarily. Pick one pattern per file.
+
+2. **Test private methods sparingly**: Just because you *can* test private methods doesn't mean you always *should*. Focus on testing behavior through public APIs when possible.
+
+3. **Use factories for complex setup**: If your class requires constructor arguments, use `#[Factory]` methods rather than complex test setup.
+
+4. **Separate integration tests**: Keep integration tests in traditional `tests/` directory. Inline tests are best for unit tests.
+
+5. **Use `#[TestDox]` for documentation**: Make your test output readable with descriptive `#[TestDox]` attributes.
+
+6. **Strip tests in production**: Use `phpunit-inline-strip` in your deployment pipeline to remove test code from production builds.
+
+7. **Don't overdo it**: Not every class needs inline tests. Use judgment about where they add value.
 
 ## Requirements
 

@@ -69,12 +69,17 @@ final class InlineTestScanner
                 continue;
             }
 
+            $filePath = $file->getPathname();
+
+            // Include the file first so all classes/functions become available
+            include_once $filePath;
+
             // Scan for class-based tests
-            $classNames = $this->extractClassNames($file->getPathname());
+            $classNames = $this->extractClassNames($filePath);
 
             foreach ($classNames as $className) {
                 try {
-                    if (!class_exists($className)) {
+                    if (!class_exists($className, false)) {
                         continue;
                     }
 
@@ -88,7 +93,9 @@ final class InlineTestScanner
                             $this->findLifecycleMethods($reflection, Before::class),
                             $this->findLifecycleMethods($reflection, After::class),
                             $this->findLifecycleMethods($reflection, BeforeClass::class),
-                            $this->findLifecycleMethods($reflection, AfterClass::class)
+                            $this->findLifecycleMethods($reflection, AfterClass::class),
+                            null,
+                            $filePath
                         );
                     }
                 } catch (ReflectionException) {
@@ -97,7 +104,7 @@ final class InlineTestScanner
                 }
             }
 
-            // Scan for function-based tests
+            // Scan for function-based tests (file already included above)
             $functionTests = $this->extractTestFunctions($file->getPathname());
             $testClasses = array_merge($testClasses, $functionTests);
         }
@@ -279,6 +286,9 @@ final class InlineTestScanner
      */
     private function extractTestFunctions(string $filePath): array
     {
+        // Normalize the file path for comparison
+        $normalizedFilePath = realpath($filePath) ?: $filePath;
+
         // Get functions before including file
         $functionsBefore = get_defined_functions()['user'];
 
@@ -308,6 +318,15 @@ final class InlineTestScanner
                 }
 
                 $reflection = new ReflectionFunction($functionName);
+
+                // Only include functions from this file
+                $functionFile = $reflection->getFileName();
+                if ($functionFile !== false) {
+                    $normalizedFunctionFile = realpath($functionFile) ?: $functionFile;
+                    if ($normalizedFunctionFile !== $normalizedFilePath) {
+                        continue;
+                    }
+                }
 
                 // Get namespace from function (namespace is part of the function name)
                 $namespace = $reflection->getNamespaceName();
@@ -400,7 +419,8 @@ final class InlineTestScanner
                     $functions['after'],
                     $functions['beforeClass'],
                     $functions['afterClass'],
-                    $namespace
+                    $namespace,
+                    $normalizedFilePath // Pass the source file for filename-based naming
                 );
             }
         }

@@ -1,0 +1,163 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * PHPUnit Inline Tests CLI
+ *
+ * This is a wrapper around PHPUnit that enables inline test discovery.
+ * Use this instead of vendor/bin/phpunit to run inline tests.
+ *
+ * Usage:
+ *   vendor/bin/phpunit-inline [phpunit-options]
+ *   vendor/bin/phpunit-inline --scan-directories=src,lib [phpunit-options]
+ */
+
+// Prevent direct execution without autoloader
+if (!defined('STDIN')) {
+    define('STDIN', fopen('php://stdin', 'r'));
+}
+
+// Find autoloader - but DON'T include it yet!
+// We need to load our override files first.
+$autoloadPaths = [
+    // When installed as a dependency
+    dirname(__DIR__, 4) . '/vendor/autoload.php',
+    // When running from the package itself (development)
+    dirname(__DIR__) . '/vendor/autoload.php',
+];
+
+$autoloadPath = null;
+
+foreach ($autoloadPaths as $path) {
+    if (file_exists($path)) {
+        $autoloadPath = $path;
+        break;
+    }
+}
+
+if ($autoloadPath === null) {
+    fwrite(STDERR, "Could not find autoloader. Did you run composer install?\n");
+    exit(1);
+}
+
+// Determine the root path (where composer.json is)
+$rootPath = dirname($autoloadPath, 2);
+
+// Parse our custom arguments before passing to PHPUnit
+$arguments = $_SERVER['argv'];
+$scanDirectories = [];
+
+// Remove script name
+array_shift($arguments);
+
+// Look for --scan-directories argument
+$filteredArguments = [];
+
+for ($i = 0; $i < count($arguments); $i++) {
+    $arg = $arguments[$i];
+
+    if (str_starts_with($arg, '--scan-directories=')) {
+        $value = substr($arg, strlen('--scan-directories='));
+        $scanDirectories = array_map('trim', explode(',', $value));
+    } elseif ($arg === '--scan-directories') {
+        // Value is in the next argument
+        if (isset($arguments[$i + 1])) {
+            $scanDirectories = array_map('trim', explode(',', $arguments[$i + 1]));
+            $i++; // Skip next argument
+        }
+    } else {
+        $filteredArguments[] = $arg;
+    }
+}
+
+// If no scan directories provided, try to get from phpunit.xml
+if (empty($scanDirectories)) {
+    $phpunitXmlPaths = [
+        $rootPath . '/phpunit.xml',
+        $rootPath . '/phpunit.xml.dist',
+    ];
+
+    foreach ($phpunitXmlPaths as $xmlPath) {
+        if (file_exists($xmlPath)) {
+            $xml = @simplexml_load_file($xmlPath);
+
+            if ($xml !== false) {
+                // Look for our extension configuration
+                $extensions = $xml->xpath('//extensions/bootstrap[contains(@class, "InlineTestExtension")]');
+
+                if (!empty($extensions)) {
+                    $parameters = $extensions[0]->xpath('parameter[@name="scanDirectories"]');
+
+                    if (!empty($parameters)) {
+                        $value = (string) $parameters[0]['value'];
+                        $scanDirectories = array_map('trim', explode(',', $value));
+                    }
+                }
+            }
+
+            break;
+        }
+    }
+}
+
+// CRITICAL: Load our override files BEFORE the autoloader loads PHPUnit classes
+// The order is:
+// 1. Load our TestSuiteLoader override (defines PHPUnit\Runner\TestSuiteLoader)
+// 2. Load composer autoloader (won't re-define our already-defined class)
+// 3. Boot our kernel (initializes TestSuite singleton with scan directories)
+// 4. Run PHPUnit (uses our TestSuiteLoader)
+
+require_once dirname(__DIR__) . '/src/overrides/Runner/TestSuiteLoader.php';
+
+// Now include the autoloader - our override class is already defined
+require_once $autoloadPath;
+
+// Boot the kernel with scan directories
+\NSRosenqvist\PHPUnitInline\Kernel::boot($rootPath, $scanDirectories);
+
+// If scan directories were provided, add them as PHPUnit arguments
+// This tells PHPUnit to scan these directories for test files
+$phpunitArgs = ['phpunit'];
+
+// Check if user already specified directories/files to test
+$hasTestPath = false;
+$hasTestSuffix = false;
+foreach ($filteredArguments as $arg) {
+    // Skip options
+    if (!str_starts_with($arg, '-')) {
+        $hasTestPath = true;
+    }
+    if (str_starts_with($arg, '--test-suffix')) {
+        $hasTestSuffix = true;
+    }
+}
+
+// If no test path specified and we have scan directories, add them
+if (!$hasTestPath && !empty($scanDirectories)) {
+    foreach ($scanDirectories as $dir) {
+        $fullPath = str_starts_with($dir, '/') ? $dir : $rootPath . '/' . $dir;
+        if (is_dir($fullPath)) {
+            $phpunitArgs[] = $fullPath;
+        }
+    }
+
+    // When scanning source directories, we need to look at all .php files
+    // not just those ending in Test.php
+    if (!$hasTestSuffix) {
+        $phpunitArgs[] = '--test-suffix=.php';
+    }
+}
+
+// Add the filtered arguments
+$phpunitArgs = array_merge($phpunitArgs, $filteredArguments);
+
+// Rebuild argv for PHPUnit
+$_SERVER['argv'] = $phpunitArgs;
+$_SERVER['argc'] = count($_SERVER['argv']);
+
+// Run PHPUnit
+$code = (new \PHPUnit\TextUI\Application())->run($_SERVER['argv']);
+
+exit($code);

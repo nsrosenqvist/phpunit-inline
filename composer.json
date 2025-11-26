@@ -9,6 +9,10 @@
             "email": "niklas.s.rosenqvist@gmail.com"
         }
     ],
+    "bin": [
+        "bin/phpunit-inline",
+        "bin/phpunit-inline-strip"
+    ],
     "require": {
         "php": "^8.2",
         "phpunit/phpunit": "^11.0 || ^12.0"
@@ -28,7 +32,8 @@
     },
     "autoload-dev": {
         "psr-4": {
-            "NSRosenqvist\\PHPUnitInline\\Tests\\": "tests/"
+            "NSRosenqvist\\PHPUnitInline\\Tests\\": "tests/",
+            "E2E\\": "tests/e2e/src/"
         }
     },
     "extra": {
@@ -48,6 +53,8 @@
     "scripts": {
         "test": "phpunit --testdox",
         "test:coverage": "phpunit --coverage-html coverage",
+        "test:e2e": "./bin/phpunit-inline --scan-directories=tests/e2e/src",
+        "test:e2e:phpstan": "phpstan analyze --configuration=tests/e2e/phpstan.neon --memory-limit=256M",
         "analyze": "phpstan analyze --memory-limit=256M",
         "analyze:baseline": "phpstan analyze --memory-limit=256M --generate-baseline",
         "analyse": "@analyze",
@@ -57,7 +64,9 @@
         "check": [
             "@format:check",
             "@analyze",
-            "@test"
+            "@test",
+            "@test:e2e",
+            "@test:e2e:phpstan"
         ]
     }
 }
