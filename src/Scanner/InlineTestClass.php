@@ -21,6 +21,7 @@ final class InlineTestClass
      * @param array<ReflectionMethod|ReflectionFunction> $beforeClassMethods
      * @param array<ReflectionMethod|ReflectionFunction> $afterClassMethods
      * @param string|null $namespace For function-only tests, the namespace they belong to
+     * @param string|null $sourceFile The source file path (for filename-based test naming)
      */
     public function __construct(
         private readonly ?ReflectionClass $reflection,
@@ -29,7 +30,8 @@ final class InlineTestClass
         private readonly array $afterMethods = [],
         private readonly array $beforeClassMethods = [],
         private readonly array $afterClassMethods = [],
-        private readonly ?string $namespace = null
+        private readonly ?string $namespace = null,
+        private readonly ?string $sourceFile = null
     ) {
     }
 
@@ -55,13 +57,32 @@ final class InlineTestClass
             return $this->reflection->getName();
         }
 
-        // For function-only tests, generate a class name from the namespace
+        // For function-only tests, generate a class name
+        // If we have a source file, use the filename (e.g., helpers.php -> HelpersTest)
+        if ($this->sourceFile !== null) {
+            $basename = pathinfo($this->sourceFile, PATHINFO_FILENAME);
+            $testClassName = ucfirst($basename) . 'Test';
+
+            // Include namespace if present
+            if ($this->namespace !== null && $this->namespace !== '') {
+                return $this->namespace . '\\' . $testClassName;
+            }
+
+            return $testClassName;
+        }
+
+        // Fallback to namespace-based naming
         return ($this->namespace ?? 'Global') . '\\Tests';
     }
 
     public function getNamespace(): ?string
     {
         return $this->namespace;
+    }
+
+    public function getSourceFile(): ?string
+    {
+        return $this->sourceFile;
     }
 
     public function isFunctionBased(): bool

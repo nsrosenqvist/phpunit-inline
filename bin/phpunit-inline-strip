@@ -1,0 +1,37 @@
+#!/usr/bin/env php
+<?php
+
+declare(strict_types=1);
+
+/**
+ * PHPUnit Inline Test Stripper
+ *
+ * Removes inline tests, factories, and data providers from source files.
+ * WARNING: This permanently modifies files. Only run during container builds or deployments.
+ */
+
+// Find autoloader
+$autoloaderPaths = [
+    __DIR__ . '/../vendor/autoload.php',
+    __DIR__ . '/../../../autoload.php',
+];
+
+$autoloader = null;
+foreach ($autoloaderPaths as $path) {
+    if (file_exists($path)) {
+        $autoloader = $path;
+        break;
+    }
+}
+
+if ($autoloader === null) {
+    fwrite(STDERR, "Could not find Composer autoloader\n");
+    exit(1);
+}
+
+require $autoloader;
+
+use NSRosenqvist\PHPUnitInline\Command\StripTestsCommand;
+
+$command = new StripTestsCommand();
+exit($command->run($argv));

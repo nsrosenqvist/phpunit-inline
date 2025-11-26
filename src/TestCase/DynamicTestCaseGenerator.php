@@ -6,6 +6,8 @@ namespace NSRosenqvist\PHPUnitInline\TestCase;
 
 use PHPUnit\Framework\TestCase;
 use NSRosenqvist\PHPUnitInline\Scanner\InlineTestClass;
+use NSRosenqvist\PHPUnitInline\Attributes\Factory;
+use NSRosenqvist\PHPUnitInline\Attributes\DefaultFactory;
 use ReflectionMethod;
 
 /**
@@ -69,17 +71,21 @@ final class DynamicTestCaseGenerator
             }
         }
 
+        // Find default factory if any
+        $defaultFactory = $this->findDefaultFactory($testClass);
+
         // Don't include <?php for eval() - it expects pure PHP code
         $code = $useStatements;
         $code .= "class {$className} extends \\PHPUnit\\Framework\\TestCase\n{\n";
 
         // Add property to hold the application class instance (only for class-based tests)
         if (!$isFunctionBased) {
-            $code .= "    private object \$instance;\n\n";
+            $code .= "    private object \$instance;\n";
+            $code .= "    private ?string \$currentFactory = null;\n\n";
         }
 
         // Add setUp method to create instance and run Before methods
-        $code .= $this->generateSetUpMethod($testClass);
+        $code .= $this->generateSetUpMethod($testClass, $defaultFactory);
 
         // Add tearDown method to run After methods
         $code .= $this->generateTearDownMethod($testClass);
@@ -99,7 +105,7 @@ final class DynamicTestCaseGenerator
             if ($testMethod instanceof \ReflectionFunction) {
                 $code .= $this->generateTestMethodFromFunction($testMethod);
             } else {
-                $code .= $this->generateTestMethod($testMethod, $originalClassName);
+                $code .= $this->generateTestMethod($testMethod, $originalClassName, $testClass);
             }
         }
 
@@ -112,6 +118,40 @@ final class DynamicTestCaseGenerator
         $code .= "}\n";
 
         return $code;
+    }
+
+    /**
+     * Find the default factory method for a class.
+     */
+    private function findDefaultFactory(InlineTestClass $testClass): ?string
+    {
+        $reflection = $testClass->getReflection();
+        if ($reflection === null) {
+            return null;
+        }
+
+        foreach ($reflection->getMethods() as $method) {
+            $attributes = $method->getAttributes(DefaultFactory::class);
+            if (!empty($attributes)) {
+                return $method->getName();
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Find the factory specified for a test method.
+     */
+    private function findTestFactory(ReflectionMethod $method): ?string
+    {
+        $attributes = $method->getAttributes(Factory::class);
+        if (empty($attributes)) {
+            return null;
+        }
+
+        $factory = $attributes[0]->newInstance();
+        return $factory->methodName;
     }
 
     /**
@@ -206,7 +246,7 @@ final class DynamicTestCaseGenerator
     /**
      * Generate the setUp method that creates the instance and runs Before methods.
      */
-    private function generateSetUpMethod(InlineTestClass $testClass): string
+    private function generateSetUpMethod(InlineTestClass $testClass, ?string $defaultFactory = null): string
     {
         $originalClass = $testClass->getReflection();
 
@@ -217,7 +257,46 @@ final class DynamicTestCaseGenerator
         // Only create instance for class-based tests
         if ($originalClass !== null) {
             $originalClassName = $originalClass->getName();
-            $code .= "        \$this->instance = new \\{$originalClassName}();\n";
+
+            if ($defaultFactory !== null) {
+                // Use default factory, but allow per-test override via currentFactory
+                $code .= "        \$factoryName = \$this->currentFactory ?? '{$defaultFactory}';\n";
+                $code .= "        \$factory = new \\ReflectionMethod('\\{$originalClassName}', \$factoryName);\n";
+                $code .= "        \$factory->setAccessible(true);\n";
+                $code .= "        \$this->instance = \$factory->invoke(null);\n";
+            } else {
+                // Check if the class has a constructor with required parameters
+                $constructor = $originalClass->getConstructor();
+                $hasRequiredParams = false;
+                if ($constructor !== null) {
+                    foreach ($constructor->getParameters() as $param) {
+                        if (!$param->isOptional()) {
+                            $hasRequiredParams = true;
+                            break;
+                        }
+                    }
+                }
+
+                if ($hasRequiredParams) {
+                    // Class requires constructor args but has no factory - check for currentFactory
+                    $code .= "        if (\$this->currentFactory !== null) {\n";
+                    $code .= "            \$factory = new \\ReflectionMethod('\\{$originalClassName}', \$this->currentFactory);\n";
+                    $code .= "            \$factory->setAccessible(true);\n";
+                    $code .= "            \$this->instance = \$factory->invoke(null);\n";
+                    $code .= "        } else {\n";
+                    $code .= "            throw new \\RuntimeException('Class {$originalClassName} requires constructor arguments. Use #[Factory] or #[DefaultFactory] attribute.');\n";
+                    $code .= "        }\n";
+                } else {
+                    // No required constructor params - can instantiate directly, but allow factory override
+                    $code .= "        if (\$this->currentFactory !== null) {\n";
+                    $code .= "            \$factory = new \\ReflectionMethod('\\{$originalClassName}', \$this->currentFactory);\n";
+                    $code .= "            \$factory->setAccessible(true);\n";
+                    $code .= "            \$this->instance = \$factory->invoke(null);\n";
+                    $code .= "        } else {\n";
+                    $code .= "            \$this->instance = new \\{$originalClassName}();\n";
+                    $code .= "        }\n";
+                }
+            }
         }
 
         // Add Before method/function calls
@@ -336,19 +415,23 @@ final class DynamicTestCaseGenerator
     /**
      * Generate a test method by extracting and adapting the original method body.
      */
-    private function generateTestMethod(ReflectionMethod $method, string $originalClassName): string
+    private function generateTestMethod(ReflectionMethod $method, string $originalClassName, InlineTestClass $testClass): string
     {
         $methodName = $method->getName();
         $methodBody = $this->extractMethodBody($method);
 
-        // Get attributes to preserve them
-        $attributes = $this->generateAttributes($method);
+        // Check if this test specifies a factory
+        $testFactory = $this->findTestFactory($method);
+
+        // Get attributes to preserve them (excluding our Factory attribute which is handled separately)
+        $attributes = $this->generateAttributes($method, [Factory::class]);
 
         $code = $attributes;
         $code .= "    public function {$methodName}(";
 
         // Add parameters if any (for data providers)
         $params = [];
+        $paramNames = [];
         foreach ($method->getParameters() as $param) {
             $paramStr = '';
             if ($param->hasType()) {
@@ -358,6 +441,7 @@ final class DynamicTestCaseGenerator
                 }
             }
             $paramStr .= '$' . $param->getName();
+            $paramNames[] = '$' . $param->getName();
             if ($param->isDefaultValueAvailable()) {
                 $default = $param->getDefaultValue();
                 $paramStr .= ' = ' . var_export($default, true);
@@ -369,8 +453,16 @@ final class DynamicTestCaseGenerator
         $code .= "): void\n";
         $code .= "    {\n";
 
+        // If test specifies a factory, set it before setUp runs
+        if ($testFactory !== null) {
+            $code .= "        // Set factory for this test\n";
+            $code .= "        \$this->currentFactory = '{$testFactory}';\n";
+            $code .= "        \$this->setUp();\n";
+            $code .= "        \n";
+        }
+
         // Adapt the method body to work in the TestCase context
-        $adaptedBody = $this->adaptMethodBody($methodBody, $originalClassName);
+        $adaptedBody = $this->adaptMethodBody($methodBody, $originalClassName, $paramNames);
         $code .= $adaptedBody;
 
         $code .= "    }\n\n";
@@ -650,35 +742,63 @@ final class DynamicTestCaseGenerator
     /**
      * Adapt the method body to work in the TestCase class context.
      * Sets up the test() helper function to provide access to PHPUnit assertions.
+     *
+     * We inline the test code directly in the TestCase method to ensure PHPUnit's
+     * protected methods (like createMock) are accessible via test()->createMock().
+     *
+     * @param array<string> $paramNames Parameter variable names (e.g., ['$input', '$expected'])
      */
-    private function adaptMethodBody(string $methodBody, string $originalClassName): string
+    private function adaptMethodBody(string $methodBody, string $originalClassName, array $paramNames = []): string
     {
-        // Strategy: Set up the global test() helper and execute the original method
-        // on the class instance. $this in the test method refers to the class instance,
-        // and test() provides access to PHPUnit assertions.
+        // Strategy: Set up the global test() helper and inline the test code.
+        // We create the instance and make it available, then execute the test code
+        // in the TestCase scope where protected methods are accessible.
 
         $adapted = "        // Set up test() helper for PHPUnit assertions\n";
         $adapted .= "        global \$__inlineTestCase;\n";
         $adapted .= "        \$__inlineTestCase = \$this;\n";
         $adapted .= "        \n";
-        $adapted .= "        // Execute test method on the class instance\n";
-        $adapted .= "        \$__instance = \$this->instance;\n";
-        $adapted .= "        \$__method = new \\ReflectionMethod(\$__instance, __FUNCTION__);\n";
-        $adapted .= "        \$__method->setAccessible(true);\n";
-        $adapted .= "        \$__method->invoke(\$__instance);\n";
+        $adapted .= "        // Make instance available as \$this would be in the original test\n";
+        $adapted .= "        \$__self = \$this->instance;\n";
+        $adapted .= "        \n";
+
+        // Build use clause for data provider parameters
+        $useClause = !empty($paramNames) ? ' use (' . implode(', ', $paramNames) . ')' : '';
+
+        $adapted .= "        // Create a closure bound to the instance so \$this->method() works\n";
+        $adapted .= "        \$__testFn = \\Closure::bind(function(){$useClause} {\n";
+
+        // Indent the original method body
+        $indentedBody = preg_replace('/^/m', '            ', $methodBody);
+        if ($indentedBody === null) {
+            $indentedBody = '            ' . str_replace("\n", "\n            ", $methodBody);
+        }
+        $adapted .= $indentedBody;
+
+        $adapted .= "\n        }, \$__self, \\{$originalClassName}::class);\n";
+        $adapted .= "        \n";
+        $adapted .= "        \$__testFn();\n";
 
         return $adapted;
     }
 
     /**
      * Generate attribute declarations for a method.
+     *
+     * @param array<class-string> $excludeAttributes Attribute classes to exclude from output
      */
-    private function generateAttributes(ReflectionMethod $method): string
+    private function generateAttributes(ReflectionMethod $method, array $excludeAttributes = []): string
     {
         $code = '';
 
         foreach ($method->getAttributes() as $attribute) {
             $name = $attribute->getName();
+
+            // Skip excluded attributes
+            if (in_array($name, $excludeAttributes, true)) {
+                continue;
+            }
+
             $args = $attribute->getArguments();
 
             $code .= "    #[\\{$name}";

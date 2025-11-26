@@ -6,4 +6,8 @@ parameters:
     paths:
         - src
         - tests
+    excludePaths:
+        - tests/e2e/src
+        - tests/e2e/bootstrap.php
+        - tests/e2e/generate-tests.php
 

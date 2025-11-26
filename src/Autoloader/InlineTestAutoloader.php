@@ -28,6 +28,18 @@ final class InlineTestAutoloader
     private array $prefixes = [];
 
     /**
+     * Create a new autoloader instance.
+     *
+     * @param array<string, string> $prefixes Optional map of namespace prefixes to base directories
+     */
+    public function __construct(array $prefixes = [])
+    {
+        foreach ($prefixes as $prefix => $baseDir) {
+            $this->addNamespace($prefix, $baseDir);
+        }
+    }
+
+    /**
      * Register this autoloader with SPL.
      *
      * @param bool $prepend Whether to prepend this autoloader (run it first)
