@@ -6,12 +6,20 @@ declare(strict_types=1);
 /**
  * PHPUnit Inline Tests CLI
  *
- * This is a wrapper around PHPUnit that enables inline test discovery.
- * Use this instead of vendor/bin/phpunit to run inline tests.
+ * This is a drop-in replacement for PHPUnit that enables inline test discovery
+ * while remaining fully backwards compatible with standard PHPUnit TestCases.
  *
  * Usage:
  *   vendor/bin/phpunit-inline [phpunit-options]
  *   vendor/bin/phpunit-inline --scan-directories=src,lib [phpunit-options]
+ *
+ * Configuration:
+ *   You can configure scan directories in phpunit.xml:
+ *   <phpunit>
+ *       <php>
+ *           <env name="PHPUNIT_INLINE_SCAN_DIRECTORIES" value="src,app"/>
+ *       </php>
+ *   </phpunit>
  */
 
 // Prevent direct execution without autoloader
@@ -72,7 +80,7 @@ for ($i = 0; $i < count($arguments); $i++) {
     }
 }
 
-// If no scan directories provided, try to get from phpunit.xml
+// If no scan directories provided via CLI, check phpunit.xml for configuration
 if (empty($scanDirectories)) {
     $phpunitXmlPaths = [
         $rootPath . '/phpunit.xml',
@@ -84,12 +92,18 @@ if (empty($scanDirectories)) {
             $xml = @simplexml_load_file($xmlPath);
 
             if ($xml !== false) {
-                // Look for our extension configuration
-                $extensions = $xml->xpath('//extensions/bootstrap[contains(@class, "InlineTestExtension")]');
+                // Method 1: Check for PHPUNIT_INLINE_SCAN_DIRECTORIES env variable
+                $envVars = $xml->xpath('//php/env[@name="PHPUNIT_INLINE_SCAN_DIRECTORIES"]');
+                if (!empty($envVars)) {
+                    $value = (string) $envVars[0]['value'];
+                    $scanDirectories = array_map('trim', explode(',', $value));
+                    break;
+                }
 
+                // Method 2: Check for legacy extension configuration (deprecated)
+                $extensions = $xml->xpath('//extensions/bootstrap[contains(@class, "InlineTestExtension")]');
                 if (!empty($extensions)) {
                     $parameters = $extensions[0]->xpath('parameter[@name="scanDirectories"]');
-
                     if (!empty($parameters)) {
                         $value = (string) $parameters[0]['value'];
                         $scanDirectories = array_map('trim', explode(',', $value));
@@ -117,41 +131,108 @@ require_once $autoloadPath;
 // Boot the kernel with scan directories
 \NSRosenqvist\PHPUnitInline\Kernel::boot($rootPath, $scanDirectories);
 
-// If scan directories were provided, add them as PHPUnit arguments
-// This tells PHPUnit to scan these directories for test files
+// Build PHPUnit arguments
+// We want to be fully backwards compatible:
+// 1. If user specifies paths/files, use those (standard PHPUnit behavior)
+// 2. If no paths specified, use phpunit.xml testsuites AND scan directories
+// 3. PHPUnit will still read phpunit.xml for other configuration
+
 $phpunitArgs = ['phpunit'];
 
 // Check if user already specified directories/files to test
 $hasTestPath = false;
-$hasTestSuffix = false;
+$hasConfig = false;
+
 foreach ($filteredArguments as $arg) {
-    // Skip options
+    // Skip options (arguments starting with -)
     if (!str_starts_with($arg, '-')) {
         $hasTestPath = true;
     }
-    if (str_starts_with($arg, '--test-suffix')) {
-        $hasTestSuffix = true;
+    // Check if config is specified
+    if (str_starts_with($arg, '--configuration') || str_starts_with($arg, '-c')) {
+        $hasConfig = true;
     }
 }
 
-// If no test path specified and we have scan directories, add them
-if (!$hasTestPath && !empty($scanDirectories)) {
-    foreach ($scanDirectories as $dir) {
-        $fullPath = str_starts_with($dir, '/') ? $dir : $rootPath . '/' . $dir;
-        if (is_dir($fullPath)) {
-            $phpunitArgs[] = $fullPath;
+// If user specified explicit test paths, just pass through to PHPUnit
+// (standard PHPUnit behavior - the user knows what they want to run)
+if ($hasTestPath) {
+    $phpunitArgs = array_merge($phpunitArgs, $filteredArguments);
+} else {
+    // No explicit test paths specified
+    // We need to collect all test directories: from phpunit.xml + scan directories
+
+    $testDirectories = [];
+    $testFiles = [];
+
+    // Parse phpunit.xml to get configured testsuites
+    $phpunitXmlPaths = [
+        $rootPath . '/phpunit.xml',
+        $rootPath . '/phpunit.xml.dist',
+    ];
+
+    foreach ($phpunitXmlPaths as $xmlPath) {
+        if (file_exists($xmlPath)) {
+            $xml = @simplexml_load_file($xmlPath);
+
+            if ($xml !== false) {
+                // Get directories from testsuites
+                $directories = $xml->xpath('//testsuites/testsuite/directory');
+                foreach ($directories as $dir) {
+                    $dirPath = (string) $dir;
+                    $fullPath = str_starts_with($dirPath, '/') ? $dirPath : $rootPath . '/' . $dirPath;
+                    if (is_dir($fullPath)) {
+                        $testDirectories[] = $fullPath;
+                    }
+                }
+
+                // Get files from testsuites
+                $files = $xml->xpath('//testsuites/testsuite/file');
+                foreach ($files as $file) {
+                    $filePath = (string) $file;
+                    $fullPath = str_starts_with($filePath, '/') ? $filePath : $rootPath . '/' . $filePath;
+                    if (file_exists($fullPath)) {
+                        $testFiles[] = $fullPath;
+                    }
+                }
+            }
+
+            break;
         }
     }
 
-    // When scanning source directories, we need to look at all .php files
-    // not just those ending in Test.php
-    if (!$hasTestSuffix) {
-        $phpunitArgs[] = '--test-suffix=.php';
+    // Add scan directories for inline tests
+    foreach ($scanDirectories as $dir) {
+        $fullPath = str_starts_with($dir, '/') ? $dir : $rootPath . '/' . $dir;
+        if (is_dir($fullPath)) {
+            $testDirectories[] = $fullPath;
+        }
+    }
+
+    // If we have test paths (from config or scan dirs), add them
+    if (!empty($testDirectories) || !empty($testFiles)) {
+        $phpunitArgs = array_merge($phpunitArgs, $filteredArguments);
+
+        // Add all directories
+        foreach (array_unique($testDirectories) as $dir) {
+            $phpunitArgs[] = $dir;
+        }
+
+        // Add all files
+        foreach (array_unique($testFiles) as $file) {
+            $phpunitArgs[] = $file;
+        }
+
+        // When scanning source directories for inline tests,
+        // we need to look at all .php files, not just *Test.php
+        if (!empty($scanDirectories)) {
+            $phpunitArgs[] = '--test-suffix=.php';
+        }
+    } else {
+        // No directories found, just pass through
+        $phpunitArgs = array_merge($phpunitArgs, $filteredArguments);
     }
 }
-
-// Add the filtered arguments
-$phpunitArgs = array_merge($phpunitArgs, $filteredArguments);
 
 // Rebuild argv for PHPUnit
 $_SERVER['argv'] = $phpunitArgs;
