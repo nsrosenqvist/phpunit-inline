@@ -157,7 +157,7 @@ This means you can adopt inline tests incrementally without abandoning your exis
 
 ### Namespace-Based Tests Setup
 
-For **namespace-based tests** (Rust-style `mod tests` pattern), you need to register the custom autoloader. This is because test classes like `App\Services\Tests\ServiceTest` are defined in the same file as `App\Services\Service`, which doesn't follow PSR-4 conventions.
+For **namespace-based tests** (Rust-style `mod tests` pattern), you need to register the custom autoloader. This is because test classes like `App\Services\Service\Tests\ServiceTest` are defined in the same file as `App\Services\Service`, which doesn't follow PSR-4 conventions.
 
 **Option 1: Use the provided bootstrap file**
 
@@ -275,6 +275,63 @@ Place your tests in a `\Tests` sub-namespace within the same file. This is the c
 
 declare(strict_types=1);
 
+namespace App\Math;
+
+function add(int $a, int $b): int
+{
+    return $a + $b;
+}
+
+function multiply(int $a, int $b): int
+{
+    return $a * $b;
+}
+
+// ==================== Tests ====================
+
+namespace App\Math\Tests;
+
+use PHPUnit\Framework\Attributes\Test;
+use PHPUnit\Framework\Attributes\DataProvider;
+use function App\Math\add;
+use function App\Math\multiply;
+
+#[Test]
+function testAdd(): void
+{
+    test()->assertEquals(5, add(2, 3));
+}
+
+#[Test]
+function testMultiply(): void
+{
+    test()->assertEquals(20, multiply(4, 5));
+}
+
+#[Test]
+#[DataProvider('additionCases')]
+function testAddWithDataProvider(int $a, int $b, int $expected): void
+{
+    test()->assertEquals($expected, add($a, $b));
+}
+
+function additionCases(): array
+{
+    return [
+        'positive numbers' => [2, 3, 5],
+        'with zero' => [5, 0, 5],
+        'negative numbers' => [-2, -3, -5],
+    ];
+}
+```
+
+**You can also use a class if you need to manage created resources**
+
+```php
+<?php
+
+declare(strict_types=1);
+
 namespace App\Services;
 
 class UserService
@@ -300,7 +357,7 @@ class UserService
 
 // ==================== Tests ====================
 
-namespace App\Services\Tests;
+namespace App\Services\UserService\Tests;
 
 use App\Services\UserService;
 use App\Services\UserRepository;
@@ -353,63 +410,6 @@ class UserServiceTest
 }
 ```
 
-**You can also use functions instead of a class:**
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Math;
-
-function add(int $a, int $b): int
-{
-    return $a + $b;
-}
-
-function multiply(int $a, int $b): int
-{
-    return $a * $b;
-}
-
-// ==================== Tests ====================
-
-namespace App\Math\Tests;
-
-use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\Attributes\DataProvider;
-use function App\Math\add;
-use function App\Math\multiply;
-
-#[Test]
-function testAdd(): void
-{
-    test()->assertEquals(5, add(2, 3));
-}
-
-#[Test]
-function testMultiply(): void
-{
-    test()->assertEquals(20, multiply(4, 5));
-}
-
-#[Test]
-#[DataProvider('additionCases')]
-function testAddWithDataProvider(int $a, int $b, int $expected): void
-{
-    test()->assertEquals($expected, add($a, $b));
-}
-
-function additionCases(): array
-{
-    return [
-        'positive numbers' => [2, 3, 5],
-        'with zero' => [5, 0, 5],
-        'negative numbers' => [-2, -3, -5],
-    ];
-}
-```
-
 ### 3. Tests for Helper Functions
 
 **Best for**: Testing functions in helper files where creating a namespace feels like overkill.
@@ -427,8 +427,13 @@ namespace App;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\DataProvider;
 
-// ==================== Helper Functions ====================
-
+/**
+ * Formats a given amount into a currency string.
+ *
+ * @param float $amount The amount to format.
+ * @param string $currency The currency code (e.g., 'USD', 'EUR', 'GBP').
+ * @return string The formatted currency string.
+ */
 function formatCurrency(float $amount, string $currency = 'USD'): string
 {
     return match ($currency) {
@@ -438,16 +443,6 @@ function formatCurrency(float $amount, string $currency = 'USD'): string
         default => number_format($amount, 2) . ' ' . $currency,
     };
 }
-
-function slugify(string $text): string
-{
-    $text = preg_replace('~[^\pL\d]+~u', '-', $text);
-    $text = trim($text, '-');
-    $text = strtolower($text);
-    return preg_replace('~-+~', '-', $text);
-}
-
-// ==================== Tests ====================
 
 #[Test]
 function testFormatCurrencyUSD(): void
@@ -460,6 +455,20 @@ function testFormatCurrencyUSD(): void
 function testFormatCurrencyEUR(): void
 {
     test()->assertEquals('€1.234,56', formatCurrency(1234.56, 'EUR'));
+}
+
+/**
+ * Convert a string into a URL-friendly "slug".
+ *
+ * @param string $text The input string to be slugified.
+ * @return string The slugified version of the input string.
+ */
+function slugify(string $text): string
+{
+    $text = preg_replace('~[^\pL\d]+~u', '-', $text);
+    $text = trim($text, '-');
+    $text = strtolower($text);
+    return preg_replace('~-+~', '-', $text);
 }
 
 #[Test]
@@ -615,7 +624,6 @@ class PaymentService
         );
     }
 
-    #[Factory('withFailingGateway')]
     private static function createWithFailingGateway(): self
     {
         $gateway = test()->createStub(PaymentGateway::class);
