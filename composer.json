@@ -55,6 +55,7 @@
         "test:coverage": "phpunit --coverage-html coverage",
         "test:e2e": "./bin/phpunit-inline --scan-directories=tests/e2e/src",
         "test:e2e:phpstan": "phpstan analyze --configuration=tests/e2e/phpstan.neon --memory-limit=256M",
+        "test:e2e:strip": "php tests/e2e-strip/run-e2e-strip.php",
         "analyze": "phpstan analyze --memory-limit=256M",
         "analyze:baseline": "phpstan analyze --memory-limit=256M --generate-baseline",
         "analyse": "@analyze",
@@ -66,7 +67,8 @@
             "@analyze",
             "@test",
             "@test:e2e",
-            "@test:e2e:phpstan"
+            "@test:e2e:phpstan",
+            "@test:e2e:strip"
         ]
     }
 }

@@ -324,9 +324,6 @@ final class TestStripper
         // Remove trailing whitespace on lines
         $content = preg_replace('/[ \t]+$/m', '', $content) ?? $content;
 
-        // Fix closing brace stuck to content (add newline before })
-        $content = preg_replace('/([^\n\s{])(})/', "$1\n$2", $content) ?? $content;
-
         return $content;
     }
 
