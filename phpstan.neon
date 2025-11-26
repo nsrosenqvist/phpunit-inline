@@ -10,4 +10,7 @@ parameters:
         - tests/e2e/src
         - tests/e2e/bootstrap.php
         - tests/e2e/generate-tests.php
+        - tests/e2e-strip/fixtures
+        - tests/e2e-strip/expected
+        - tests/e2e-strip/run-e2e-strip.php
 
