@@ -795,7 +795,7 @@ No additional configuration is needed if you use `phpstan/extension-installer`.
 
 ## Stripping Tests for Production
 
-Inline tests add overhead to your source files. For production deployments, you can strip all test code using the provided command.
+Inline tests add overhead to your source files. For production deployments, you can strip all test code using the provided command. Unused methods shouldn't affect your application's performance, as long as you use opcache, so this is primarily for slimming down the production build.
 
 > **⚠️ Warning**: This command **permanently modifies files**. Only run this during container image builds or deployment pipelines. **Never run this on your development environment.**
 
@@ -883,11 +883,7 @@ deploy:
 
 4. **Separate integration tests**: Keep integration tests in traditional `tests/` directory. Inline tests are best for unit tests.
 
-5. **Use `#[TestDox]` for documentation**: Make your test output readable with descriptive `#[TestDox]` attributes.
-
-6. **Strip tests in production**: Use `phpunit-inline-strip` in your deployment pipeline to remove test code from production builds.
-
-7. **Don't overdo it**: Not every class needs inline tests. Use judgment about where they add value.
+5. **Don't overdo it**: Not every class needs inline tests. Use judgment about where they add value.
 
 ## Requirements
 
