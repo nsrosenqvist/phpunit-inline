@@ -3,7 +3,7 @@
 > **⚠️ Experimental Project**  
 > This is an experimental project to explore ideas around inline testing in PHP. It is **not recommended for production use** at this time. The API and implementation may change significantly as concepts are refined.
 
-A PHPUnit extension that enables writing tests inline with your application code using PHPUnit's native `#[Test]` attribute, inspired by Rust's testing approach.
+A PHPUnit runner that enables writing tests inline with your application code using PHPUnit's native `#[Test]` attribute, inspired by Rust's testing approach.
 
 ## Table of Contents
 
