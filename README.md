@@ -98,9 +98,33 @@ Run your tests with the provided CLI wrapper:
 ./vendor/bin/phpunit-inline --scan-directories=src --testdox --colors=always
 ```
 
+### Backwards Compatibility with Existing Tests
+
+The CLI wrapper is **fully backwards compatible** with existing PHPUnit test suites. If you have a `phpunit.xml` configuration with testsuites defined, those tests will run alongside your inline tests:
+
+```bash
+# Runs both phpunit.xml testsuites AND inline tests from src/
+./vendor/bin/phpunit-inline --scan-directories=src
+
+# Works as a drop-in replacement for vendor/bin/phpunit
+./vendor/bin/phpunit-inline
+```
+
+This means you can adopt inline tests incrementally without abandoning your existing test infrastructure. Traditional tests in `tests/` and inline tests in `src/` will all run together in a single test run.
+
 ### Namespace-Based Tests Setup
 
-For **namespace-based tests** (Rust-style `mod tests` pattern), you need to register the custom autoloader. Create or update your PHPUnit bootstrap file:
+For **namespace-based tests** (Rust-style `mod tests` pattern), you need to register the custom autoloader. This is because test classes like `App\Services\Tests\ServiceTest` are defined in the same file as `App\Services\Service`, which doesn't follow PSR-4 conventions.
+
+**Option 1: Use the provided bootstrap file**
+
+```xml
+<phpunit bootstrap="vendor/nsrosenqvist/phpunit-inline/src/bootstrap.php">
+    <!-- ... -->
+</phpunit>
+```
+
+**Option 2: Register manually in your own bootstrap file**
 
 ```php
 <?php
@@ -122,6 +146,8 @@ Then reference it in your `phpunit.xml`:
     <!-- ... -->
 </phpunit>
 ```
+
+> **Note:** If you only use inline tests inside classes (pattern #1) or same-namespace functions (pattern #3), you don't need this autoloader setup.
 
 ## Use Cases
 
