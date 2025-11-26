@@ -12,7 +12,7 @@ use PHPUnit\Framework\Attributes\Test;
 function testAdditionWithProvider(int $a, int $b, int $expected): void
 {
     $result = $a + $b;
-    assert($result === $expected, "Expected {$expected}, got {$result}");
+    test()->assertEquals($expected, $result);
 }
 
 function additionProvider(): array

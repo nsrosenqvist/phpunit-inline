@@ -39,14 +39,14 @@ final class Calculator
     private function testAdd(): void
     {
         $result = $this->add(2, 3);
-        $this->assertEquals(5, $result);
+        test()->assertEquals(5, $result);
     }
 
     #[Test]
     private function testSubtract(): void
     {
         $result = $this->subtract(10, 3);
-        $this->assertEquals(7, $result);
+        test()->assertEquals(7, $result);
     }
 
     #[Test]
@@ -54,7 +54,7 @@ final class Calculator
     {
         // This tests that we can access private methods
         $result = $this->multiply(4, 5);
-        $this->assertEquals(20, $result);
+        test()->assertEquals(20, $result);
     }
 
     #[Test]
@@ -62,14 +62,14 @@ final class Calculator
     {
         // This tests that we can access protected methods
         $result = $this->divide(20, 4);
-        $this->assertEquals(5, $result);
+        test()->assertEquals(5, $result);
     }
 
     #[Test]
     private function testDivideByZeroThrowsException(): void
     {
-        $this->expectException(\InvalidArgumentException::class);
-        $this->expectExceptionMessage('Cannot divide by zero');
+        test()->expectException(\InvalidArgumentException::class);
+        test()->expectExceptionMessage('Cannot divide by zero');
 
         $this->divide(10, 0);
     }

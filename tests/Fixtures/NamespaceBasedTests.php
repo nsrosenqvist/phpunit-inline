@@ -41,7 +41,7 @@ final class CalculatorTests
         $calculator = new Calculator();
         $result = $calculator->add(2, 3);
 
-        $this->assertEquals(5, $result);
+        test()->assertEquals(5, $result);
     }
 
     #[Test]
@@ -50,7 +50,7 @@ final class CalculatorTests
         $calculator = new Calculator();
         $result = $calculator->multiply(4, 5);
 
-        $this->assertEquals(20, $result);
+        test()->assertEquals(20, $result);
     }
 
     #[Test]
@@ -60,7 +60,7 @@ final class CalculatorTests
         $calculator = new Calculator();
         $result = $calculator->add($a, $b);
 
-        $this->assertEquals($expected, $result);
+        test()->assertEquals($expected, $result);
     }
 
     /**

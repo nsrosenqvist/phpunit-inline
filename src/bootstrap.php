@@ -38,6 +38,9 @@ if ($vendorAutoload !== null) {
     require_once $vendorAutoload;
 }
 
+// Load the test() helper function
+require_once __DIR__ . '/helpers.php';
+
 use NSRosenqvist\PHPUnitInline\Autoloader\InlineTestAutoloader;
 
 // Find the project's composer.json by walking up the directory tree

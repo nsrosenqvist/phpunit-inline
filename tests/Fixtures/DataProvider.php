@@ -80,7 +80,7 @@ final class DataProvider
     private function testAddition(int $a, int $b, int $expected): void
     {
         $result = $this->add($a, $b);
-        $this->assertEquals($expected, $result);
+        test()->assertEquals($expected, $result);
     }
 
     #[Test]
@@ -88,27 +88,27 @@ final class DataProvider
     private function testMultiplication(int $a, int $b, int $expected): void
     {
         $result = $this->multiply($a, $b);
-        $this->assertEquals($expected, $result);
+        test()->assertEquals($expected, $result);
     }
 
     #[Test]
     private function testWithoutDataProvider(): void
     {
         // Regular test without data provider should still work
-        $this->assertEquals(10, $this->add(7, 3));
+        test()->assertEquals(10, $this->add(7, 3));
     }
 
     #[Test]
     #[DataProviderAttribute('privateStaticProvider')]
     private function testWithPrivateStaticProvider(int $a, int $b, int $expected): void
     {
-        $this->assertEquals($expected, $this->multiply($a, $b));
+        test()->assertEquals($expected, $this->multiply($a, $b));
     }
 
     #[Test]
     #[DataProviderAttribute('privateInstanceProvider')]
     private function testWithPrivateInstanceProvider(int $a, int $b, int $expected): void
     {
-        $this->assertEquals($expected, $this->multiply($a, $b));
+        test()->assertEquals($expected, $this->multiply($a, $b));
     }
 }

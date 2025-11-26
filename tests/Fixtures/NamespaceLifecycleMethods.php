@@ -62,8 +62,8 @@ final class EmailServiceTests
         \Acme\Service\Tests\EmailServiceTests::$executionLog[] = 'itSendsEmails';
         $this->service->send('test@example.com', 'Hello');
 
-        $this->assertCount(1, $this->service->getSentEmails());
-        $this->assertContains('test@example.com: Hello', $this->service->getSentEmails());
+        test()->assertCount(1, $this->service->getSentEmails());
+        test()->assertContains('test@example.com: Hello', $this->service->getSentEmails());
     }
 
     #[Test]
@@ -71,7 +71,7 @@ final class EmailServiceTests
     {
         \Acme\Service\Tests\EmailServiceTests::$executionLog[] = 'itStartsWithEmptyList';
         // Service should be fresh from setUp
-        $this->assertEmpty($this->service->getSentEmails());
+        test()->assertEmpty($this->service->getSentEmails());
     }
 
     #[After]

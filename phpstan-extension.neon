@@ -39,17 +39,11 @@ parameters:
         -
             message: '#^Parameter .+ of static method NSRosenqvist\\PHPUnitInline\\TestCase\\InlineTestCase::createTest\(\) expects ReflectionClass<object>, ReflectionClass<.+> given\.$#'
             path: 'tests/*'
-        # Function-based tests: $this is bound to TestCase context via closures
+        # Function-based data providers can return generic arrays
         -
-            message: '#^Undefined variable: \$this$#'
-            paths:
-                - tests/Fixtures/FunctionBasedTests.php
-                - tests/Fixtures/FunctionBasedTestsWithDataProvider.php
-        -
-            message: '#^Cannot call method .+ on mixed\.$#'
-            paths:
-                - tests/Fixtures/FunctionBasedTests.php
-                - tests/Fixtures/FunctionBasedTestsWithDataProvider.php
+            message: '#^Function .+Provider\(\) return type has no value type specified in iterable type array\.$#'
+            path: tests/Fixtures/FunctionBasedTestsWithDataProvider.php
+        # Attributes on functions - PHPUnit doesn't officially support this but we make it work
         -
             message: '#^Attribute class PHPUnit\\Framework\\Attributes\\Test does not have the function target\.$#'
             paths:
@@ -57,10 +51,6 @@ parameters:
                 - tests/Fixtures/FunctionBasedTestsWithDataProvider.php
         -
             message: '#^Attribute class PHPUnit\\Framework\\Attributes\\DataProvider does not have the function target\.$#'
-            path: tests/Fixtures/FunctionBasedTestsWithDataProvider.php
-        # Function-based data providers can return generic arrays
-        -
-            message: '#^Function .+Provider\(\) return type has no value type specified in iterable type array\.$#'
             path: tests/Fixtures/FunctionBasedTestsWithDataProvider.php
         # Test helper methods that verify scanner behavior
         -
