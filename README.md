@@ -98,6 +98,49 @@ Run your tests with the provided CLI wrapper:
 ./vendor/bin/phpunit-inline --scan-directories=src --testdox --colors=always
 ```
 
+### Configuration in phpunit.xml
+
+Instead of passing `--scan-directories` every time, you can configure the directories in your `phpunit.xml`:
+
+**Option 1: Using `<inlineTests>` element (recommended)**
+
+```xml
+<phpunit bootstrap="vendor/autoload.php">
+    <inlineTests>
+        <directory>src</directory>
+        <directory>app</directory>
+    </inlineTests>
+    
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
+```
+
+**Option 2: Using environment variable**
+
+```xml
+<phpunit bootstrap="vendor/autoload.php">
+    <php>
+        <env name="PHPUNIT_INLINE_SCAN_DIRECTORIES" value="src,app"/>
+    </php>
+    
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>
+```
+
+Then simply run:
+
+```bash
+./vendor/bin/phpunit-inline
+```
+
 ### Backwards Compatibility with Existing Tests
 
 The CLI wrapper is **fully backwards compatible** with existing PHPUnit test suites. If you have a `phpunit.xml` configuration with testsuites defined, those tests will run alongside your inline tests:
