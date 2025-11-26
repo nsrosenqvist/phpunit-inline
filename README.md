@@ -98,6 +98,31 @@ The extension includes PHPStan integration. It's automatically registered via `p
 
 ## Usage
 
+### The `test()` Helper Function
+
+The extension provides a global `test()` function for accessing PHPUnit assertions. This creates a clear separation:
+- **`$this`** - Refers to your class instance (access private/protected methods and properties)
+- **`test()`** - Returns the PHPUnit TestCase (use for assertions, mocking, etc.)
+
+```php
+#[Test]
+private function testSomething(): void
+{
+    $result = $this->privateMethod();    // Class method
+    test()->assertEquals(5, $result);    // PHPUnit assertion
+    test()->assertTrue($result > 0);     // Another assertion
+    
+    $mock = test()->createMock(Foo::class);  // Create mocks
+    test()->expectException(\Exception::class);  // Exception testing
+}
+```
+
+This design:
+- Makes it explicit which context you're using
+- Works identically for class-based and function-based tests
+- Avoids confusing `$this` semantics in functions
+- Provides full IDE autocompletion on `test()->`
+
 ### Class-Based Tests
 
 Write tests as methods within your application classes:
@@ -136,9 +161,9 @@ final class Calculator
     #[Test]
     private function testAdd(): void
     {
-        // $this has access to both the class methods and PHPUnit assertions
+        // $this refers to the class instance, test() provides PHPUnit assertions
         $result = $this->add(2, 3);
-        $this->assertEquals(5, $result);
+        test()->assertEquals(5, $result);
     }
 
     #[Test]
@@ -146,14 +171,14 @@ final class Calculator
     {
         // Can access private methods directly - no reflection needed!
         $result = $this->multiply(4, 5);
-        $this->assertEquals(20, $result);
+        test()->assertEquals(20, $result);
     }
 
     #[Test]
     protected function testDivideByZeroThrowsException(): void
     {
         // Full PHPUnit feature support including exception testing
-        $this->expectException(\InvalidArgumentException::class);
+        test()->expectException(\InvalidArgumentException::class);
         $this->divide(10, 0);
     }
 
@@ -161,8 +186,8 @@ final class Calculator
     private function testCanUseMocking(): void
     {
         // Even mocking works!
-        $mock = $this->createMock(\stdClass::class);
-        $this->assertInstanceOf(\stdClass::class, $mock);
+        $mock = test()->createMock(\stdClass::class);
+        test()->assertInstanceOf(\stdClass::class, $mock);
     }
 }
 ```
@@ -204,14 +229,14 @@ use function App\Math\multiply;
 function testAdd(): void
 {
     $result = add(2, 3);
-    $this->assertEquals(5, $result); // $this has access to PHPUnit assertions!
+    test()->assertEquals(5, $result); // test() provides PHPUnit assertions
 }
 
 #[Test]
 function testMultiply(): void
 {
     $result = multiply(4, 5);
-    $this->assertEquals(20, $result);
+    test()->assertEquals(20, $result);
 }
 
 #[Test]
@@ -219,7 +244,7 @@ function testMultiply(): void
 function testAddWithDataProvider(int $a, int $b, int $expected): void
 {
     $result = add($a, $b);
-    $this->assertEquals($expected, $result);
+    test()->assertEquals($expected, $result);
 }
 
 function additionDataProvider(): array
@@ -275,8 +300,8 @@ class UserServiceTest
     public function testCreateUser(): void
     {
         $user = $this->service->createUser('test@example.com');
-        $this->assertInstanceOf(User::class, $user);
-        $this->assertEquals('test@example.com', $user->email);
+        test()->assertInstanceOf(User::class, $user);
+        test()->assertEquals('test@example.com', $user->email);
     }
 }
 ```
@@ -290,9 +315,8 @@ The extension works through several components:
 3. **Test Generator**: Creates dynamic TestCase instances that wrap your classes or functions
 4. **Context Binding**: Routes method calls appropriately:
    - Class methods → Your class instance (for testing private/protected methods)
-   - Function bodies → Bound with TestCase context (for assertions)
-   - PHPUnit assertions → TestCase methods (assertEquals, assertInstanceOf, etc.)
-5. **PHPStan Integration**: Understands the dual context and prevents false positives
+   - `test()` helper → PHPUnit TestCase (for assertions like assertEquals, assertInstanceOf)
+5. **PHPStan Integration**: Understands the test() helper and prevents false positives
 
 ### Behind the Scenes
 
@@ -301,8 +325,8 @@ The extension works through several components:
 #[Test]
 private function testMultiply(): void
 {
-    $result = $this->multiply(4, 5);  // Calls private method
-    $this->assertEquals(20, $result);  // Calls PHPUnit assertion
+    $result = $this->multiply(4, 5);  // Calls private method on class
+    test()->assertEquals(20, $result);  // Calls PHPUnit assertion
 }
 ```
 
@@ -310,7 +334,7 @@ The extension:
 1. Discovers this method during test scanning
 2. Creates a dynamic `TestCase` wrapper class
 3. Routes `$this->multiply()` to your class instance
-4. Routes `$this->assertEquals()` to PHPUnit's assertion methods
+4. Routes `test()->assertEquals()` to PHPUnit's assertion methods
 5. Executes with full PHPUnit features
 
 **For function-based tests:**
@@ -319,7 +343,7 @@ The extension:
 function testAdd(): void
 {
     $result = add(2, 3);
-    $this->assertEquals(5, $result);  // $this magically works in functions!
+    test()->assertEquals(5, $result);  // test() provides PHPUnit assertions
 }
 ```
 
@@ -327,8 +351,8 @@ The extension:
 1. Discovers functions with `#[Test]` attribute
 2. Groups functions by namespace
 3. Creates a dynamic `TestCase` class for each namespace
-4. Binds each function body to the TestCase context using closures
-5. Makes `$this` available inside functions for PHPUnit assertions
+4. Sets up the `test()` helper to provide access to PHPUnit assertions
+5. Calls the test function directly
 
 ## Comparison with Traditional Tests
 
@@ -363,7 +387,7 @@ class Calculator {
     
     #[Test]
     private function testMultiply(): void {
-        $this->assertEquals(20, $this->multiply(4, 5));
+        test()->assertEquals(20, $this->multiply(4, 5));
     }
 }
 ```
@@ -401,14 +425,14 @@ final class OrderProcessor
     private function testProcessOrderWithMocks(): void
     {
         // Create mocks with expectations
-        $paymentGateway = $this->createMock(PaymentGateway::class);
-        $paymentGateway->expects($this->once())
+        $paymentGateway = test()->createMock(PaymentGateway::class);
+        $paymentGateway->expects(test()->once())
             ->method('charge')
             ->with(100.00)
             ->willReturn(true);
 
-        $emailService = $this->createMock(EmailService::class);
-        $emailService->expects($this->once())
+        $emailService = test()->createMock(EmailService::class);
+        $emailService->expects(test()->once())
             ->method('sendConfirmation');
 
         // Test with mocked dependencies
@@ -417,17 +441,17 @@ final class OrderProcessor
         
         $result = $processor->processOrder($order);
         
-        $this->assertTrue($result);
+        test()->assertTrue($result);
     }
 
     #[Test]
     private function testWithStubs(): void
     {
         // Stubs are simpler - no expectations
-        $paymentStub = $this->createStub(PaymentGateway::class);
+        $paymentStub = test()->createStub(PaymentGateway::class);
         $paymentStub->method('charge')->willReturn(true);
         
-        $emailStub = $this->createStub(EmailService::class);
+        $emailStub = test()->createStub(EmailService::class);
         
         $processor = new OrderProcessor($paymentStub, $emailStub);
         // ... rest of test
@@ -497,7 +521,7 @@ class MathTest
     #[DataProvider('additionProvider')]
     public function testAddition(int $a, int $b, int $expected): void
     {
-        $this->assertEquals($expected, $a + $b);
+        test()->assertEquals($expected, $a + $b);
     }
 
     public static function additionProvider(): array
@@ -522,7 +546,7 @@ use PHPUnit\Framework\Attributes\{Test, DataProvider};
 function testStringManipulation(string $input, string $expected): void
 {
     $result = manipulate($input);
-    $this->assertEquals($expected, $result);
+    test()->assertEquals($expected, $result);
 }
 
 function stringCases(): array

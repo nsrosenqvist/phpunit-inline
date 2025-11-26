@@ -456,22 +456,16 @@ final class DynamicTestCaseGenerator
             $paramNames[] = '$' . $param->getName();
         }
 
-        // For functions, just bind to TestCase context
-        $adapted = "        // Execute test function with TestCase context\n";
-        $adapted .= "        \$__testCase = \$this;\n";
+        // For functions, set up the test() helper and call the function directly
+        $fullFunctionName = $function->getName();
+        $useClause = !empty($paramNames) ? implode(', ', $paramNames) : '';
+
+        $adapted = "        // Set up test() helper for PHPUnit assertions\n";
+        $adapted .= "        global \$__inlineTestCase;\n";
+        $adapted .= "        \$__inlineTestCase = \$this;\n";
         $adapted .= "        \n";
-        $adapted .= "        // Execute the function body with \$this bound to TestCase\n";
-        if (!empty($paramNames)) {
-            $useClause = ' use (' . implode(', ', $paramNames) . ')';
-        } else {
-            $useClause = '';
-        }
-        $adapted .= "        \$__executor = function(){$useClause} {\n";
-        $adapted .= $functionBody;
-        $adapted .= "        };\n";
-        $adapted .= "        \n";
-        $adapted .= "        \$__bound = \\Closure::bind(\$__executor, \$__testCase, get_class(\$__testCase));\n";
-        $adapted .= "        \$__bound();\n";
+        $adapted .= "        // Call the test function directly\n";
+        $adapted .= "        \\{$fullFunctionName}({$useClause});\n";
 
         $code .= $adapted;
         $code .= "    }\n\n";
@@ -655,65 +649,23 @@ final class DynamicTestCaseGenerator
 
     /**
      * Adapt the method body to work in the TestCase class context.
-     * Redirects $this-> calls to work with the instance through a proxy.
+     * Sets up the test() helper function to provide access to PHPUnit assertions.
      */
     private function adaptMethodBody(string $methodBody, string $originalClassName): string
     {
-        // Strategy: Use a closure bound to a proxy object that handles both instance and TestCase access
-        // We'll extract the method body and execute it in a context where $this means the proxy
+        // Strategy: Set up the global test() helper and execute the original method
+        // on the class instance. $this in the test method refers to the class instance,
+        // and test() provides access to PHPUnit assertions.
 
-        $adapted = "        // Execute test method with proxy context\n";
+        $adapted = "        // Set up test() helper for PHPUnit assertions\n";
+        $adapted .= "        global \$__inlineTestCase;\n";
+        $adapted .= "        \$__inlineTestCase = \$this;\n";
+        $adapted .= "        \n";
+        $adapted .= "        // Execute test method on the class instance\n";
         $adapted .= "        \$__instance = \$this->instance;\n";
-        $adapted .= "        \$__testCase = \$this;\n";
-        $adapted .= "        \n";
-        $adapted .= "        // Create a proxy that delegates to both instance and TestCase\n";
-        $adapted .= "        \$__proxy = new class(\$__instance, \$__testCase) {\n";
-        $adapted .= "            public function __construct(\n";
-        $adapted .= "                private object \$instance,\n";
-        $adapted .= "                private \\PHPUnit\\Framework\\TestCase \$testCase\n";
-        $adapted .= "            ) {}\n";
-        $adapted .= "            \n";
-        $adapted .= "            public function __call(string \$method, array \$args): mixed {\n";
-        $adapted .= "                if (method_exists(\$this->instance, \$method)) {\n";
-        $adapted .= "                    \$reflection = new \\ReflectionMethod(\$this->instance, \$method);\n";
-        $adapted .= "                    \$reflection->setAccessible(true);\n";
-        $adapted .= "                    return \$reflection->invoke(\$this->instance, ...\$args);\n";
-        $adapted .= "                }\n";
-        $adapted .= "                if (method_exists(\$this->testCase, \$method)) {\n";
-        $adapted .= "                    return \$this->testCase->\$method(...\$args);\n";
-        $adapted .= "                }\n";
-        $adapted .= "                throw new \\BadMethodCallException(\"Method \$method not found\");\n";
-        $adapted .= "            }\n";
-        $adapted .= "            \n";
-        $adapted .= "            public function __get(string \$name): mixed {\n";
-        $adapted .= "                \$reflection = new \\ReflectionClass(\$this->instance);\n";
-        $adapted .= "                if (\$reflection->hasProperty(\$name)) {\n";
-        $adapted .= "                    \$property = \$reflection->getProperty(\$name);\n";
-        $adapted .= "                    \$property->setAccessible(true);\n";
-        $adapted .= "                    return \$property->getValue(\$this->instance);\n";
-        $adapted .= "                }\n";
-        $adapted .= "                throw new \\RuntimeException(\"Property \$name not found\");\n";
-        $adapted .= "            }\n";
-        $adapted .= "            \n";
-        $adapted .= "            public function __set(string \$name, mixed \$value): void {\n";
-        $adapted .= "                \$reflection = new \\ReflectionClass(\$this->instance);\n";
-        $adapted .= "                if (\$reflection->hasProperty(\$name)) {\n";
-        $adapted .= "                    \$property = \$reflection->getProperty(\$name);\n";
-        $adapted .= "                    \$property->setAccessible(true);\n";
-        $adapted .= "                    \$property->setValue(\$this->instance, \$value);\n";
-        $adapted .= "                    return;\n";
-        $adapted .= "                }\n";
-        $adapted .= "                \$this->instance->\$name = \$value;\n";
-        $adapted .= "            }\n";
-        $adapted .= "        };\n";
-        $adapted .= "        \n";
-        $adapted .= "        // Execute the method body with \$this bound to the proxy\n";
-        $adapted .= "        \$__executor = function() {\n";
-        $adapted .= $methodBody;
-        $adapted .= "        };\n";
-        $adapted .= "        \n";
-        $adapted .= "        \$__bound = \\Closure::bind(\$__executor, \$__proxy, get_class(\$__proxy));\n";
-        $adapted .= "        \$__bound();\n";
+        $adapted .= "        \$__method = new \\ReflectionMethod(\$__instance, __FUNCTION__);\n";
+        $adapted .= "        \$__method->setAccessible(true);\n";
+        $adapted .= "        \$__method->invoke(\$__instance);\n";
 
         return $adapted;
     }

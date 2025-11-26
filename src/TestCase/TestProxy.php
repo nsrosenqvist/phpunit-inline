@@ -162,6 +162,10 @@ final class TestProxy
 
         // Create a closure that executes the method body with $this as the proxy
         $executor = function () use ($methodBody, $args) {
+            // Set up the test() helper
+            global $__inlineTestCase;
+            $__inlineTestCase = $this->testCase;
+
             // Extract parameters from $args array
             // Use PHP's extract to create variables from the data provider array
             if (!empty($args)) {

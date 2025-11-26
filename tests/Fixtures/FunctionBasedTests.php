@@ -27,19 +27,19 @@ use function Acme\Math\multiply;
 function testAdd(): void
 {
     $result = add(2, 3);
-    $this->assertEquals(5, $result);
+    test()->assertEquals(5, $result);
 }
 
 #[Test]
 function testMultiply(): void
 {
     $result = multiply(4, 5);
-    $this->assertEquals(20, $result);
+    test()->assertEquals(20, $result);
 }
 
 #[Test]
 function testAddNegative(): void
 {
     $result = add(-2, -3);
-    $this->assertEquals(-5, $result);
+    test()->assertEquals(-5, $result);
 }

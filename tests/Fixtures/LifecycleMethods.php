@@ -38,7 +38,7 @@ final class LifecycleMethods
     public function testOne(): void
     {
         \NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'testOne';
-        $this->assertEquals(10, $this->value);
+        test()->assertEquals(10, $this->value);
         $this->value = 20;
     }
 
@@ -47,7 +47,7 @@ final class LifecycleMethods
     {
         \NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods::$executionLog[] = 'testTwo';
         // Value should be reset to 10 by setUp
-        $this->assertEquals(10, $this->value);
+        test()->assertEquals(10, $this->value);
     }
 
     #[After]
