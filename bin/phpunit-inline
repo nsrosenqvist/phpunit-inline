@@ -13,8 +13,17 @@ declare(strict_types=1);
  *   vendor/bin/phpunit-inline [phpunit-options]
  *   vendor/bin/phpunit-inline --scan-directories=src,lib [phpunit-options]
  *
- * Configuration:
- *   You can configure scan directories in phpunit.xml:
+ * Configuration in phpunit.xml:
+ *
+ *   Option 1 - Using <inlineTests> element (recommended):
+ *   <phpunit>
+ *       <inlineTests>
+ *           <directory>src</directory>
+ *           <directory>app</directory>
+ *       </inlineTests>
+ *   </phpunit>
+ *
+ *   Option 2 - Using environment variable:
  *   <phpunit>
  *       <php>
  *           <env name="PHPUNIT_INLINE_SCAN_DIRECTORIES" value="src,app"/>
@@ -92,7 +101,21 @@ if (empty($scanDirectories)) {
             $xml = @simplexml_load_file($xmlPath);
 
             if ($xml !== false) {
-                // Method 1: Check for PHPUNIT_INLINE_SCAN_DIRECTORIES env variable
+                // Method 1 (recommended): Check for <inlineTests><directory> elements
+                $inlineDirectories = $xml->xpath('//inlineTests/directory');
+                if (!empty($inlineDirectories)) {
+                    foreach ($inlineDirectories as $dir) {
+                        $dirValue = trim((string) $dir);
+                        if ($dirValue !== '') {
+                            $scanDirectories[] = $dirValue;
+                        }
+                    }
+                    if (!empty($scanDirectories)) {
+                        break;
+                    }
+                }
+
+                // Method 2: Check for PHPUNIT_INLINE_SCAN_DIRECTORIES env variable
                 $envVars = $xml->xpath('//php/env[@name="PHPUNIT_INLINE_SCAN_DIRECTORIES"]');
                 if (!empty($envVars)) {
                     $value = (string) $envVars[0]['value'];
@@ -100,7 +123,7 @@ if (empty($scanDirectories)) {
                     break;
                 }
 
-                // Method 2: Check for legacy extension configuration (deprecated)
+                // Method 3: Check for legacy extension configuration (deprecated)
                 $extensions = $xml->xpath('//extensions/bootstrap[contains(@class, "InlineTestExtension")]');
                 if (!empty($extensions)) {
                     $parameters = $extensions[0]->xpath('parameter[@name="scanDirectories"]');
