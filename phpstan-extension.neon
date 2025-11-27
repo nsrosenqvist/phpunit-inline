@@ -1,74 +1,25 @@
 services:
+    # Return type extensions for helper functions
+    -
+        class: NSRosenqvist\PHPUnitInline\PHPStan\TestFunctionReturnTypeExtension
+        tags:
+            - phpstan.broker.dynamicFunctionReturnTypeExtension
     -
         class: NSRosenqvist\PHPUnitInline\PHPStan\StateReturnTypeExtension
         tags:
-            - phpstan.dynamicFunctionReturnTypeExtension
+            - phpstan.broker.dynamicFunctionReturnTypeExtension
+
+    # Mark methods with inline test attributes as always used
+    -
+        class: NSRosenqvist\PHPUnitInline\PHPStan\InlineTestMethodUsageExtension
+        tags:
+            - phpstan.methods.alwaysUsedMethodExtension
 
 parameters:
-    reportUnmatchedIgnoredErrors: false
+    # PHPUnit attributes don't officially support function targets, but we make it work.
+    # Users of this library who write function-based tests will see these warnings
+    # unless they add similar ignores to their own PHPStan config.
     ignoreErrors:
-        # Methods with #[Test] attribute are invoked via reflection by the test runner
         -
-            message: '#^Method .+::test.+\(\) is unused\.$#'
-            path: '*'
-        # State initializer methods are invoked via reflection by the test runner
-        -
-            message: '#^(Static )?[Mm]ethod .+::(init|setup|create).*(State|state)\(\) is unused\.$#'
-            path: '*'
-        # Data provider methods are invoked via reflection
-        -
-            message: '#^(Static )?[Mm]ethod .+::.+(Provider|provider)\(\) is unused\.$#'
-            path: '*'
-        # Anonymous test helper classes have private methods that are intentionally unused
-        -
-            message: '#^Method class@anonymous.+::privateMethod\(\) is unused\.$#'
-            path: '*'
-        # Generic type covariance for ReflectionClass - test infrastructure limitation
-        -
-            message: '#^Parameter .+ expects ReflectionClass<object>, ReflectionClass<.+> given\.$#'
-            path: 'tests/*'
-        # Test assertions that verify successful execution will be always-true
-        -
-            message: '#^Call to method PHPUnit\\Framework\\Assert::(assertTrue|assertSame|assertEquals|assertIsArray)\(\) .+ will always evaluate to true\.$#'
-            path: 'tests/*'
-        # Protected TestCase methods (expectException, etc.) are accessible via TestProxy's __call()
-        -
-            message: '#^Call to protected method .+ of class PHPUnit\\Framework\\TestCase\.$#'
-            path: '*'
-        # TestProxy uses __call() to route all method calls dynamically
-        -
-            message: '#^Call to an undefined method NSRosenqvist\\PHPUnitInline\\TestCase\\TestProxy::.+\(\)\.$#'
-            path: 'tests/*'
-        # Function-based data providers can return generic arrays
-        -
-            message: '#^Function .+Provider\(\) return type has no value type specified in iterable type array\.$#'
-            path: tests/Fixtures/FunctionBasedTestsWithDataProvider.php
-        # Attributes on functions - PHPUnit doesn't officially support this but we make it work
-        -
-            message: '#^Attribute class PHPUnit\\Framework\\Attributes\\Test does not have the function target\.$#'
-            paths:
-                - tests/Fixtures/FunctionBasedTests.php
-                - tests/Fixtures/FunctionBasedTestsWithDataProvider.php
-                - tests/Fixtures/StateFunctionBased.php
-        -
-            message: '#^Attribute class PHPUnit\\Framework\\Attributes\\DataProvider does not have the function target\.$#'
-            path: tests/Fixtures/FunctionBasedTestsWithDataProvider.php
-        # Test helper methods that verify scanner behavior
-        -
-            message: '#^Method NSRosenqvist\\PHPUnitInline\\Scanner\\InlineTestScanner::scan\(\) invoked with 1 parameter, 0 required\.$#'
-            path: tests/Integration/*
-        -
-            message: '#^Call to an undefined method PHPUnit\\Framework\\Test::tests\(\)\.$#'
-            path: tests/Integration/*
-        -
-            message: '#^Parameter .+ of (function count|static method PHPUnit\\Framework\\Assert::assertCount\(\)) expects .+, mixed given\.$#'
-            path: tests/Integration/*
-        -
-            message: '#^Argument of an invalid type mixed supplied for foreach, only iterables are supported\.$#'
-            path: tests/Integration/FunctionBasedTestExecutionTest.php
-        -
-            message: '#^Cannot call method name\(\) on mixed\.$#'
-            path: tests/Integration/FunctionBasedTestExecutionTest.php
-        -
-            message: '#^Binary operation "\." between non-falsy-string and mixed results in an error\.$#'
-            path: tests/Integration/FunctionBasedDataProviderExecutionTest.php
+            identifier: attribute.target
+            reportUnmatched: false

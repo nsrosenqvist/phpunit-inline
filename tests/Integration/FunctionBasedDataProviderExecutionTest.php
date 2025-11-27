@@ -16,7 +16,7 @@ final class FunctionBasedDataProviderExecutionTest extends TestCase
         // by checking that the scanner discovers them and the suite builder creates valid test classes
 
         $scanner = new InlineTestScanner([__DIR__ . '/../Fixtures']);
-        $testClasses = $scanner->scan(__DIR__ . '/../Fixtures/FunctionBasedTestsWithDataProvider.php');
+        $testClasses = $scanner->scan();
 
         $testClass = null;
         foreach ($testClasses as $tc) {

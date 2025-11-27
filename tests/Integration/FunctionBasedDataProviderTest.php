@@ -13,7 +13,7 @@ final class FunctionBasedDataProviderTest extends TestCase
     public function testFunctionBasedTestsWithDataProvider(): void
     {
         $scanner = new InlineTestScanner([__DIR__ . '/../Fixtures']);
-        $testClasses = $scanner->scan(__DIR__ . '/../Fixtures/FunctionBasedTestsWithDataProvider.php');
+        $testClasses = $scanner->scan();
 
         // Find the function-based test class
         $testClass = null;

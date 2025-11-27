@@ -31,20 +31,17 @@ final class FactoryExample
 
     // ==================== Factories ====================
 
-    /** @phpstan-ignore method.unused */
     #[DefaultFactory]
     private static function createDefault(): self
     {
         return new self('Default', 2);
     }
 
-    /** @phpstan-ignore method.unused */
     private static function createWithCustomPrefix(): self
     {
         return new self('Custom', 3);
     }
 
-    /** @phpstan-ignore method.unused */
     private static function createWithHighMultiplier(): self
     {
         return new self('High', 10);

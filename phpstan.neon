@@ -1,12 +1,60 @@
-includes:
-    - phpstan-extension.neon
-
 parameters:
     level: max
     paths:
         - src
         - tests
     excludePaths:
-        - tests/Fixtures/runner
-        - tests/Fixtures/strip
+        # Fixture files that use inline tests - analyzed separately with extension loaded
+        - tests/Fixtures
+    ignoreErrors:
+        # ReflectionClass template covariance - PHPStan is overly strict here
+        # new ReflectionClass(SomeClass::class) produces ReflectionClass<SomeClass> but
+        # methods expect ReflectionClass<object>. This is safe at runtime.
+        -
+            identifier: argument.type
+            path: tests/Integration/*
+            message: '#expects ReflectionClass<object>#'
+        # Test assertions that always pass - these are sanity checks in tests
+        -
+            identifier: method.alreadyNarrowedType
+            path: tests/*
+        # TestProxy uses __call magic to forward method calls
+        -
+            identifier: method.notFound
+            path: tests/Unit/TestCase/TestProxyTest.php
+        # Anonymous classes in tests have methods that appear unused but are tested via reflection
+        -
+            identifier: method.unused
+            path: tests/Unit/TestCase/TestProxyTest.php
+        # MockingTestFixture has inline test methods called via reflection
+        -
+            identifier: method.unused
+            path: tests/Integration/MockingTest.php
+        # Function-based tests reference classes that are in fixtures (not autoloaded for analysis)
+        -
+            identifier: class.notFound
+            path: tests/Integration/NamespaceLifecycleTest.php
+        # Tests calling methods on suite builder results - dynamic types
+        -
+            identifier: method.notFound
+            path: tests/Integration/FunctionBasedDataProviderTest.php
+        -
+            identifier: argument.type
+            path: tests/Integration/FunctionBasedDataProviderTest.php
+        -
+            identifier: method.notFound
+            path: tests/Integration/FunctionBasedTestExecutionTest.php
+        -
+            identifier: argument.type
+            path: tests/Integration/FunctionBasedTestExecutionTest.php
+        -
+            identifier: foreach.nonIterable
+            path: tests/Integration/FunctionBasedTestExecutionTest.php
+        -
+            identifier: method.nonObject
+            path: tests/Integration/FunctionBasedTestExecutionTest.php
+        # Binary operation on mixed type from data provider reflection
+        -
+            identifier: binaryOp.invalid
+            path: tests/Integration/FunctionBasedDataProviderExecutionTest.php
 
