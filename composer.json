@@ -1,6 +1,6 @@
 {
     "name": "nsrosenqvist/phpunit-inline",
-    "description": "PHPUnit extension for writing tests inline with application code using native #[Test] attributes",
+    "description": "PHPUnit runner for writing tests inline with application code using native #[Test] attributes",
     "type": "library",
     "license": "MIT",
     "authors": [
