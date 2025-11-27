@@ -1,7 +1,7 @@
 # PHPUnit Inline Tests
 
 > **⚠️ Experimental Project**  
-> This is an experimental project to explore ideas around inline testing in PHP. It is **not recommended for production use** at this time. The API and implementation may change significantly as concepts are refined.
+> This is an experimental project to explore ideas around inline testing in PHP. It is **not recommended for use** at this time. The API and implementation may change significantly as concepts are refined.
 
 A PHPUnit runner that enables writing tests inline with your application code using PHPUnit's native `#[Test]` attribute, inspired by Rust's testing approach.
 
@@ -17,6 +17,7 @@ A PHPUnit runner that enables writing tests inline with your application code us
   - [3. Tests for Helper Functions](#3-tests-for-helper-functions)
 - [The test() Helper Function](#the-test-helper-function)
 - [Factory Methods](#factory-methods)
+- [State Management](#state-management)
 - [Lifecycle Methods](#lifecycle-methods)
 - [Data Providers](#data-providers)
 - [Mocking Support](#mocking-support)
@@ -39,9 +40,10 @@ A PHPUnit runner that enables writing tests inline with your application code us
 - ✅ **Test stripping** - Remove inline tests for production builds
 - ✅ PHPStan integration to prevent false positives
 - ✅ Configurable directory scanning
-- ✅ PSR-12 compliant with strict types
 
 ## Why Inline Tests?
+
+This project is built on the idea of code colocation: when tests live alongside the code they test, writing them becomes simpler and test-driven development feels more natural.
 
 Inspired by Rust's `#[test]` attribute, this extension allows you to:
 - Keep tests close to the code they test
@@ -155,9 +157,9 @@ The CLI wrapper is **fully backwards compatible** with existing PHPUnit test sui
 
 This means you can adopt inline tests incrementally without abandoning your existing test infrastructure. Traditional tests in `tests/` and inline tests in `src/` will all run together in a single test run.
 
-### Namespace-Based Tests Setup
+### Custom Autoloader Setup
 
-For **namespace-based tests** (Rust-style `mod tests` pattern), you need to register the custom autoloader. This is because test classes like `App\Services\Service\Tests\ServiceTest` are defined in the same file as `App\Services\Service`, which doesn't follow PSR-4 conventions.
+If you use **helper classes in `\Tests` sub-namespaces** (such as state classes for type-hinting), you need to register the custom autoloader. This is because classes like `App\Services\SomeService\Tests\TestState` are defined in the same file as `App\Services\SomeService`, which doesn't follow PSR-4 conventions.
 
 **Option 1: Use the provided bootstrap file**
 
@@ -175,7 +177,7 @@ For **namespace-based tests** (Rust-style `mod tests` pattern), you need to regi
 
 require_once __DIR__ . '/../vendor/autoload.php';
 
-// Register inline test autoloader for namespace-based tests
+// Register inline test autoloader for helper classes in \Tests namespaces
 use NSRosenqvist\PHPUnitInline\Autoloader\InlineTestAutoloader;
 
 $autoloader = InlineTestAutoloader::fromComposerJson(__DIR__ . '/../composer.json');
@@ -190,11 +192,11 @@ Then reference it in your `phpunit.xml`:
 </phpunit>
 ```
 
-> **Note:** If you only use inline tests inside classes (pattern #1) or same-namespace functions (pattern #3), you don't need this autoloader setup.
+> **Note:** If you only use inline tests inside classes (pattern #1) or function-based tests (patterns #2 and #3), you don't need this autoloader setup. It's only required when you define helper classes (like state classes) in `\Tests` sub-namespaces.
 
 ## Use Cases
 
-This extension supports three main patterns for organizing inline tests. Choose the one that best fits your needs.
+This extension supports three main patterns for organizing inline tests. Choose what best fits your needs.
 
 ### 1. Inline Tests Inside a Class
 
@@ -230,7 +232,6 @@ final class Calculator
     #[TestDox('Adding two numbers returns their sum')]
     private function testAdd(): void
     {
-        // $this refers to the Calculator instance
         $result = $this->add(2, 3);
         
         // test() provides PHPUnit assertions
@@ -241,7 +242,6 @@ final class Calculator
     #[TestDox('Can test private multiply method directly')]
     private function testMultiplyPrivateMethod(): void
     {
-        // Direct access to private methods - no reflection needed!
         $result = $this->multiply(4, 5);
         test()->assertEquals(20, $result);
     }
@@ -249,7 +249,6 @@ final class Calculator
     #[Test]
     private function testWithMocking(): void
     {
-        // Full PHPUnit mocking support
         $mock = test()->createMock(\stdClass::class);
         test()->assertInstanceOf(\stdClass::class, $mock);
     }
@@ -322,91 +321,6 @@ function additionCases(): array
         'with zero' => [5, 0, 5],
         'negative numbers' => [-2, -3, -5],
     ];
-}
-```
-
-**You can also use a class if you need to manage created resources**
-
-```php
-<?php
-
-declare(strict_types=1);
-
-namespace App\Services;
-
-class UserService
-{
-    public function __construct(
-        private UserRepository $repository,
-        private EmailService $emailService,
-    ) {}
-
-    public function createUser(string $email, string $name): User
-    {
-        $user = new User($email, $name);
-        $this->repository->save($user);
-        $this->emailService->sendWelcome($user);
-        return $user;
-    }
-
-    public function findByEmail(string $email): ?User
-    {
-        return $this->repository->findByEmail($email);
-    }
-}
-
-// ==================== Tests ====================
-
-namespace App\Services\UserService\Tests;
-
-use App\Services\UserService;
-use App\Services\UserRepository;
-use App\Services\EmailService;
-use App\Services\User;
-use PHPUnit\Framework\Attributes\Test;
-use PHPUnit\Framework\Attributes\Before;
-use PHPUnit\Framework\Attributes\TestDox;
-
-class UserServiceTest
-{
-    private UserService $service;
-    private UserRepository $repository;
-    private EmailService $emailService;
-
-    #[Before]
-    public function setUp(): void
-    {
-        $this->repository = test()->createMock(UserRepository::class);
-        $this->emailService = test()->createMock(EmailService::class);
-        $this->service = new UserService($this->repository, $this->emailService);
-    }
-
-    #[Test]
-    #[TestDox('Creating a user saves to repository and sends welcome email')]
-    public function testCreateUser(): void
-    {
-        $this->repository->expects(test()->once())
-            ->method('save');
-
-        $this->emailService->expects(test()->once())
-            ->method('sendWelcome');
-
-        $user = $this->service->createUser('john@example.com', 'John Doe');
-
-        test()->assertInstanceOf(User::class, $user);
-        test()->assertEquals('john@example.com', $user->getEmail());
-    }
-
-    #[Test]
-    public function testFindByEmailReturnsNullWhenNotFound(): void
-    {
-        $this->repository->method('findByEmail')
-            ->willReturn(null);
-
-        $result = $this->service->findByEmail('unknown@example.com');
-
-        test()->assertNull($result);
-    }
 }
 ```
 
@@ -529,8 +443,6 @@ private function testExample(): void
 }
 ```
 
-**Note:** In function-based tests, `$this` is not available. Only use `test()` for assertions.
-
 ## Factory Methods
 
 For classes that require constructor arguments, use factory methods to create instances for testing.
@@ -545,7 +457,7 @@ declare(strict_types=1);
 namespace App\Services;
 
 use PHPUnit\Framework\Attributes\Test;
-use NSRosenqvist\PHPUnitInline\Attributes\Factory;
+use NSRosenqvist\PHPUnitInline\Attributes\DefaultFactory;
 
 class OrderProcessor
 {
@@ -561,7 +473,7 @@ class OrderProcessor
 
     // ==================== Test Support ====================
 
-    #[Factory]
+    #[DefaultFactory]
     private static function createForTesting(): self
     {
         return new self(
@@ -643,7 +555,7 @@ class PaymentService
     }
 
     #[Test]
-    #[Factory('withFailingGateway')]
+    #[Factory('createWithFailingGateway')]
     private function testChargeReturnsFalseOnGatewayFailure(): void
     {
         // Uses the failing gateway factory
@@ -652,6 +564,163 @@ class PaymentService
     }
 }
 ```
+
+## State Management
+
+For tests that need shared state across all test methods (similar to PHPUnit's `setUpBeforeClass()`), use the `#[State]` attribute and `state()` helper function.
+
+### Basic Usage
+
+The `#[State]` attribute marks a function or static method as a state initializer. The return value becomes the shared state accessible via `state()`.
+
+**Function-based example:**
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Database\Tests;
+
+use NSRosenqvist\PHPUnitInline\Attributes\State;
+use PHPUnit\Framework\Attributes\Test;
+
+/**
+ * State class for type-hinting.
+ */
+class DatabaseState
+{
+    public \PDO $connection;
+    /** @var array<string, mixed> */
+    public array $fixtures = [];
+}
+
+#[State]
+function initState(): DatabaseState
+{
+    $state = new DatabaseState();
+    $state->connection = new \PDO('sqlite::memory:');
+    $state->connection->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
+    return $state;
+}
+
+#[Test]
+function testInsertUser(): void
+{
+    state()->connection->exec("INSERT INTO users (name) VALUES ('John')");
+    
+    $count = state()->connection->query('SELECT COUNT(*) FROM users')->fetchColumn();
+    test()->assertEquals(1, (int) $count);
+}
+
+#[Test]
+function testCanSeeInsertedUser(): void
+{
+    // State is shared - this test can see data from previous test
+    $count = state()->connection->query('SELECT COUNT(*) FROM users')->fetchColumn();
+    test()->assertGreaterThanOrEqual(1, (int) $count);
+}
+```
+
+**Class-based example:**
+
+```php
+<?php
+
+declare(strict_types=1);
+
+namespace App\Services;
+
+use NSRosenqvist\PHPUnitInline\Attributes\State;
+use PHPUnit\Framework\Attributes\Test;
+
+/**
+ * @phpstan-type TestState array{multiplier: int, results: array<int>}
+ */
+class Calculator
+{
+    public function multiply(int $a, int $b): int
+    {
+        return $a * $b;
+    }
+
+    /**
+     * State initializer must be static for class-based tests.
+     *
+     * @return TestState
+     */
+    #[State]
+    private static function initTestState(): array
+    {
+        return [
+            'multiplier' => 10,
+            'results' => [],
+        ];
+    }
+
+    #[Test]
+    private function testWithState(): void
+    {
+        /** @var TestState $s */
+        $s = state();
+        $result = $this->multiply(5, $s['multiplier']);
+        test()->assertEquals(50, $result);
+    }
+
+    #[Test]
+    private function testCanModifyState(): void
+    {
+        /** @var TestState $s */
+        $s = state();
+        $s['results'][] = $this->multiply(2, $s['multiplier']);
+        state($s); // Update the state
+
+        test()->assertEquals([20], $s['results']);
+    }
+}
+```
+
+### State Behavior
+
+- **Initialized once**: The state initializer runs once before all tests (like `setUpBeforeClass()`)
+- **Shared across tests**: All tests in the same test case share the same state
+- **Mutable**: Tests can modify state by calling `state($newValue)`
+- **NOT reset between tests**: Changes persist across individual test methods
+
+### Type Hinting
+
+For better IDE support, create a dedicated state class with a return type on your initializer:
+
+```php
+class TestState
+{
+    public \PDO $db;
+    public UserService $service;
+    /** @var array<User> */
+    public array $users = [];
+}
+
+#[State]
+function initState(): TestState
+{
+    $state = new TestState();
+    $state->db = new \PDO('sqlite::memory:');
+    $state->service = new UserService($state->db);
+    return $state;
+}
+
+#[Test]
+function testSomething(): void
+{
+    $s = state();
+    $s->service->createUser('John');
+    // ...
+}
+```
+
+The included PHPStan extension automatically infers the return type of `state()` based on the return type of your `#[State]` initializer function/method. This means PHPStan will understand that `$s` is of type `TestState` in the example above.
+
+> **Note:** For IDE autocompletion, you may still need `@var` annotations since IDEs may not load the PHPStan extension.
 
 ## Lifecycle Methods
 
@@ -664,49 +733,58 @@ declare(strict_types=1);
 
 namespace App\Database\Tests;
 
+use NSRosenqvist\PHPUnitInline\Attributes\State;
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\Before;
 use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\BeforeClass;
 use PHPUnit\Framework\Attributes\AfterClass;
 
-class DatabaseTest
+class TestState
 {
-    private static \PDO $connection;
+    public \PDO $connection;
+}
 
-    #[BeforeClass]
-    public static function setUpDatabase(): void
-    {
-        self::$connection = new \PDO('sqlite::memory:');
-        self::$connection->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
-    }
+#[State]
+function initState(): TestState
+{
+    $state = new TestState();
+    $state->connection = new \PDO('sqlite::memory:');
+    $state->connection->exec('CREATE TABLE users (id INTEGER PRIMARY KEY, name TEXT)');
+    return $state;
+}
 
-    #[Before]
-    public function beginTransaction(): void
-    {
-        self::$connection->beginTransaction();
-    }
+#[BeforeClass]
+function setUpDatabase(): void
+{
+    // Additional setup that runs once before all tests
+}
 
-    #[Test]
-    public function testInsertUser(): void
-    {
-        self::$connection->exec("INSERT INTO users (name) VALUES ('John')");
-        
-        $count = self::$connection->query('SELECT COUNT(*) FROM users')->fetchColumn();
-        test()->assertEquals(1, $count);
-    }
+#[Before]
+function beginTransaction(): void
+{
+    state()->connection->beginTransaction();
+}
 
-    #[After]
-    public function rollbackTransaction(): void
-    {
-        self::$connection->rollBack();
-    }
+#[Test]
+function testInsertUser(): void
+{
+    state()->connection->exec("INSERT INTO users (name) VALUES ('John')");
+    
+    $count = state()->connection->query('SELECT COUNT(*) FROM users')->fetchColumn();
+    test()->assertEquals(1, $count);
+}
 
-    #[AfterClass]
-    public static function tearDownDatabase(): void
-    {
-        self::$connection = null;
-    }
+#[After]
+function rollbackTransaction(): void
+{
+    state()->connection->rollBack();
+}
+
+#[AfterClass]
+function tearDownDatabase(): void
+{
+    // Cleanup that runs once after all tests
 }
 ```
 
@@ -791,13 +869,17 @@ private function testWithMocks(): void
 
 ## PHPStan Integration
 
-The extension includes PHPStan integration that is automatically registered via `phpstan/extension-installer`. This prevents false positives for:
+The extension includes PHPStan integration that is automatically registered via `phpstan/extension-installer`. This provides:
 
+**False positive prevention:**
 - `#[Test]` methods being reported as "unused"
 - `#[Before]`, `#[After]`, `#[BeforeClass]`, `#[AfterClass]` methods being reported as "unused"
 - `#[Factory]` and `#[DefaultFactory]` methods being reported as "unused"
 - `#[DataProvider]` methods being reported as "unused"
 - Protected TestCase methods accessed via the `test()` helper
+
+**Type inference:**
+- `state()` return type is automatically inferred from the `#[State]` initializer's return type
 
 No additional configuration is needed if you use `phpstan/extension-installer`.
 
@@ -830,6 +912,7 @@ The strip command removes:
 - Methods with `#[Before]`, `#[After]`, `#[BeforeClass]`, `#[AfterClass]` attributes
 - Methods with `#[DataProvider]` attribute (when only used by tests)
 - Methods with `#[Factory]` and `#[DefaultFactory]` attributes
+- Methods and functions with `#[State]` attribute
 - Functions with `#[Test]` attribute
 - Entire `\Tests` sub-namespaces
 - Test-related `use` statements

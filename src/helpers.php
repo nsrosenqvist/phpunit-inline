@@ -125,4 +125,49 @@ namespace {
     {
         return \NSRosenqvist\PHPUnitInline\test();
     }
+
+    /**
+     * Get or set the shared test state for inline tests.
+     *
+     * State is initialized once per test case via a #[State] attributed function/method
+     * and is shared across all tests in that test case. Unlike setUp(), state is NOT
+     * reset between individual tests.
+     *
+     * Usage:
+     *   // Get state
+     *   $s = state();
+     *   $s->db->exec('...');
+     *
+     *   // Update state
+     *   $s = state();
+     *   $s->counter++;
+     *   state($s);
+     *
+     * @template T
+     * @param T|null $newState New state to set (optional)
+     * @return T|mixed The current state
+     */
+    function state(mixed $newState = null): mixed
+    {
+        global $__inlineTestCase;
+
+        if (!isset($__inlineTestCase) || !$__inlineTestCase instanceof \PHPUnit\Framework\TestCase) {
+            throw new \RuntimeException(
+                'state() can only be called from within an inline test method. ' .
+                'Make sure your test has the #[Test] attribute.'
+            );
+        }
+
+        // State is stored as a static property on the generated TestCase class
+        // The generated class has getState() and setState() static methods
+        $testCaseClass = get_class($__inlineTestCase);
+
+        if (func_num_args() > 0) {
+            // @phpstan-ignore-next-line - setState is defined on the generated TestCase class
+            $testCaseClass::setState($newState);
+        }
+
+        // @phpstan-ignore-next-line - getState is defined on the generated TestCase class
+        return $testCaseClass::getState();
+    }
 }

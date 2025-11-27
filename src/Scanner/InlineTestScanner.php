@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace NSRosenqvist\PHPUnitInline\Scanner;
 
+use NSRosenqvist\PHPUnitInline\Attributes\State;
 use PHPUnit\Framework\Attributes\After;
 use PHPUnit\Framework\Attributes\AfterClass;
 use PHPUnit\Framework\Attributes\Before;
@@ -86,18 +87,24 @@ final class InlineTestScanner
                     $reflection = new ReflectionClass($className);
                     $testMethods = $this->findTestMethods($reflection);
 
-                    if (!empty($testMethods)) {
-                        $testClasses[] = new InlineTestClass(
-                            $reflection,
-                            $testMethods,
-                            $this->findLifecycleMethods($reflection, Before::class),
-                            $this->findLifecycleMethods($reflection, After::class),
-                            $this->findLifecycleMethods($reflection, BeforeClass::class),
-                            $this->findLifecycleMethods($reflection, AfterClass::class),
-                            null,
-                            $filePath
-                        );
+                    // Skip classes without test methods - this allows helper classes
+                    // (like State classes) to exist in \Tests namespaces without being
+                    // picked up as test classes
+                    if (empty($testMethods)) {
+                        continue;
                     }
+
+                    $testClasses[] = new InlineTestClass(
+                        $reflection,
+                        $testMethods,
+                        $this->findLifecycleMethods($reflection, Before::class),
+                        $this->findLifecycleMethods($reflection, After::class),
+                        $this->findLifecycleMethods($reflection, BeforeClass::class),
+                        $this->findLifecycleMethods($reflection, AfterClass::class),
+                        $this->findStateInitializer($reflection),
+                        null,
+                        $filePath
+                    );
                 } catch (ReflectionException) {
                     // Skip files that can't be reflected
                     continue;
@@ -280,6 +287,27 @@ final class InlineTestScanner
     }
 
     /**
+     * Find the state initializer method in a class (marked with #[State]).
+     *
+     * @param ReflectionClass<object> $reflection
+     */
+    private function findStateInitializer(ReflectionClass $reflection): ?ReflectionMethod
+    {
+        foreach ($reflection->getMethods() as $method) {
+            $attributes = $method->getAttributes(
+                State::class,
+                ReflectionAttribute::IS_INSTANCEOF
+            );
+
+            if (!empty($attributes)) {
+                return $method;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Extract test functions from a PHP file and group them by namespace.
      *
      * @return array<InlineTestClass>
@@ -331,6 +359,18 @@ final class InlineTestScanner
                 // Get namespace from function (namespace is part of the function name)
                 $namespace = $reflection->getNamespaceName();
 
+                // Initialize namespace group if needed
+                if (!isset($namespaceGroups[$namespace])) {
+                    $namespaceGroups[$namespace] = [
+                        'tests' => [],
+                        'before' => [],
+                        'after' => [],
+                        'beforeClass' => [],
+                        'afterClass' => [],
+                        'stateInitializer' => null,
+                    ];
+                }
+
                 // Check if function has Test attribute
                 $testAttributes = $reflection->getAttributes(
                     Test::class,
@@ -338,68 +378,28 @@ final class InlineTestScanner
                 );
 
                 if (!empty($testAttributes)) {
-                    if (!isset($namespaceGroups[$namespace])) {
-                        $namespaceGroups[$namespace] = [
-                            'tests' => [],
-                            'before' => [],
-                            'after' => [],
-                            'beforeClass' => [],
-                            'afterClass' => [],
-                        ];
-                    }
                     $namespaceGroups[$namespace]['tests'][] = $reflection;
+                }
+
+                // Check for State attribute
+                if (!empty($reflection->getAttributes(State::class, ReflectionAttribute::IS_INSTANCEOF))) {
+                    $namespaceGroups[$namespace]['stateInitializer'] = $reflection;
                 }
 
                 // Check for lifecycle attributes
                 if (!empty($reflection->getAttributes(Before::class, ReflectionAttribute::IS_INSTANCEOF))) {
-                    if (!isset($namespaceGroups[$namespace])) {
-                        $namespaceGroups[$namespace] = [
-                            'tests' => [],
-                            'before' => [],
-                            'after' => [],
-                            'beforeClass' => [],
-                            'afterClass' => [],
-                        ];
-                    }
                     $namespaceGroups[$namespace]['before'][] = $reflection;
                 }
 
                 if (!empty($reflection->getAttributes(After::class, ReflectionAttribute::IS_INSTANCEOF))) {
-                    if (!isset($namespaceGroups[$namespace])) {
-                        $namespaceGroups[$namespace] = [
-                            'tests' => [],
-                            'before' => [],
-                            'after' => [],
-                            'beforeClass' => [],
-                            'afterClass' => [],
-                        ];
-                    }
                     $namespaceGroups[$namespace]['after'][] = $reflection;
                 }
 
                 if (!empty($reflection->getAttributes(BeforeClass::class, ReflectionAttribute::IS_INSTANCEOF))) {
-                    if (!isset($namespaceGroups[$namespace])) {
-                        $namespaceGroups[$namespace] = [
-                            'tests' => [],
-                            'before' => [],
-                            'after' => [],
-                            'beforeClass' => [],
-                            'afterClass' => [],
-                        ];
-                    }
                     $namespaceGroups[$namespace]['beforeClass'][] = $reflection;
                 }
 
                 if (!empty($reflection->getAttributes(AfterClass::class, ReflectionAttribute::IS_INSTANCEOF))) {
-                    if (!isset($namespaceGroups[$namespace])) {
-                        $namespaceGroups[$namespace] = [
-                            'tests' => [],
-                            'before' => [],
-                            'after' => [],
-                            'beforeClass' => [],
-                            'afterClass' => [],
-                        ];
-                    }
                     $namespaceGroups[$namespace]['afterClass'][] = $reflection;
                 }
 
@@ -419,6 +419,7 @@ final class InlineTestScanner
                     $functions['after'],
                     $functions['beforeClass'],
                     $functions['afterClass'],
+                    $functions['stateInitializer'],
                     $namespace,
                     $normalizedFilePath // Pass the source file for filename-based naming
                 );

@@ -11,13 +11,12 @@ use NSRosenqvist\PHPUnitInline\TestCase\InlineTestCase;
 use NSRosenqvist\PHPUnitInline\Tests\Fixtures\Calculator;
 
 /**
- * End-to-end test that actually executes inline tests through the full extension flow.
+ * Integration tests for the InlineTestScanner and InlineTestCase classes.
  *
- * Note: Full end-to-end execution with lifecycle methods, factories, etc. requires
- * using the DynamicTestCaseGenerator which creates test classes that PHPUnit runs.
- * These tests verify that InlineTestCase::runInlineTest() works for basic test execution.
+ * These tests verify that the scanner correctly finds test classes, methods,
+ * lifecycle hooks, data providers, and factories in fixture files.
  */
-final class EndToEndTest extends TestCase
+final class ScannerIntegrationTest extends TestCase
 {
     #[Test]
     public function testCalculatorBasicTestsExecute(): void

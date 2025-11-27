@@ -131,6 +131,53 @@ PHP;
     }
 
     #[Test]
+    public function testStripsReferencedFactoryMethods(): void
+    {
+        $input = <<<'PHP'
+<?php
+
+class Service
+{
+    public function __construct(private Dep $dep)
+    {
+    }
+
+    public function run(): void
+    {
+    }
+
+    #[DefaultFactory]
+    private static function createDefault(): self
+    {
+        return new self(new MockDep());
+    }
+
+    // This factory is referenced by #[Factory('createCustom')] but has no attribute itself
+    private static function createCustom(): self
+    {
+        return new self(new CustomDep());
+    }
+
+    #[Test]
+    #[Factory('createCustom')]
+    private function testWithCustomFactory(): void
+    {
+        test()->assertTrue(true);
+    }
+}
+PHP;
+
+        $result = $this->stripper->strip($input);
+
+        $this->assertStringNotContainsString('#[DefaultFactory]', $result);
+        $this->assertStringNotContainsString('function createDefault', $result);
+        $this->assertStringNotContainsString('function createCustom', $result);
+        $this->assertStringNotContainsString('#[Test]', $result);
+        $this->assertStringNotContainsString('testWithCustomFactory', $result);
+        $this->assertStringContainsString('function run', $result);
+    }
+
+    #[Test]
     public function testStripsDataProviderMethods(): void
     {
         $input = <<<'PHP'
@@ -458,6 +505,110 @@ PHP;
         $this->assertStringContainsString('namespace App\Fixtures', $result);
         $this->assertStringContainsString('class BaseTestCase', $result);
         $this->assertStringContainsString('class UserFixture', $result);
+    }
+
+    #[Test]
+    public function testStripsStateMethods(): void
+    {
+        $input = <<<'PHP'
+<?php
+
+namespace App;
+
+use NSRosenqvist\PHPUnitInline\Attributes\State;
+use PHPUnit\Framework\Attributes\Test;
+
+class Calculator
+{
+    public function add(int $a, int $b): int
+    {
+        return $a + $b;
+    }
+
+    #[State]
+    private static function initState(): array
+    {
+        return ['multiplier' => 10];
+    }
+
+    #[Test]
+    private function testAdd(): void
+    {
+        test()->assertEquals(5, $this->add(2, 3));
+    }
+}
+PHP;
+
+        $result = $this->stripper->strip($input);
+
+        $this->assertStringContainsString('function add', $result);
+        $this->assertStringNotContainsString('#[State]', $result);
+        $this->assertStringNotContainsString('initState', $result);
+        $this->assertStringNotContainsString('#[Test]', $result);
+        $this->assertStringNotContainsString('testAdd', $result);
+        $this->assertStringNotContainsString('use NSRosenqvist\PHPUnitInline\Attributes\State', $result);
+    }
+
+    #[Test]
+    public function testStripsStateFunctions(): void
+    {
+        $input = <<<'PHP'
+<?php
+
+namespace App\Tests;
+
+use NSRosenqvist\PHPUnitInline\Attributes\State;
+use PHPUnit\Framework\Attributes\Test;
+
+class TestState
+{
+    public int $counter = 0;
+}
+
+#[State]
+function initState(): TestState
+{
+    return new TestState();
+}
+
+#[Test]
+function testSomething(): void
+{
+    test()->assertEquals(0, state()->counter);
+}
+PHP;
+
+        $result = $this->stripper->strip($input);
+
+        // The entire Tests namespace should be stripped
+        $this->assertStringNotContainsString('namespace App\Tests', $result);
+    }
+
+    #[Test]
+    public function testStripsUseStateFunctionStatement(): void
+    {
+        $input = <<<'PHP'
+<?php
+
+namespace App;
+
+use function test;
+use function state;
+use App\SomeClass;
+
+class MyClass
+{
+    public function doSomething(): void
+    {
+    }
+}
+PHP;
+
+        $result = $this->stripper->strip($input);
+
+        $this->assertStringNotContainsString('use function test', $result);
+        $this->assertStringNotContainsString('use function state', $result);
+        $this->assertStringContainsString('use App\SomeClass;', $result);
     }
 
     private function normalizeWhitespace(string $content): string

@@ -33,8 +33,7 @@ final class DynamicTestCaseGenerator
 
         $classCode = $this->buildClassCode($className, $testClass);
 
-        // Create the class
-        // @phpstan-ignore-next-line - eval() creates the class, but PHPStan can't verify this
+        // Create the class dynamically
         eval($classCode);
 
         /** @var class-string<TestCase> */
@@ -78,6 +77,17 @@ final class DynamicTestCaseGenerator
         $code = $useStatements;
         $code .= "class {$className} extends \\PHPUnit\\Framework\\TestCase\n{\n";
 
+        // Add static state property and accessors (for #[State] support)
+        $code .= "    private static mixed \$__state = null;\n\n";
+        $code .= "    public static function getState(): mixed\n";
+        $code .= "    {\n";
+        $code .= "        return self::\$__state;\n";
+        $code .= "    }\n\n";
+        $code .= "    public static function setState(mixed \$state): void\n";
+        $code .= "    {\n";
+        $code .= "        self::\$__state = \$state;\n";
+        $code .= "    }\n\n";
+
         // Add property to hold the application class instance (only for class-based tests)
         if (!$isFunctionBased) {
             $code .= "    private object \$instance;\n";
@@ -90,8 +100,8 @@ final class DynamicTestCaseGenerator
         // Add tearDown method to run After methods
         $code .= $this->generateTearDownMethod($testClass);
 
-        // Add setUpBeforeClass for BeforeClass methods
-        if (!empty($testClass->getBeforeClassMethods())) {
+        // Add setUpBeforeClass for BeforeClass methods and state initialization
+        if (!empty($testClass->getBeforeClassMethods()) || $testClass->getStateInitializer() !== null) {
             $code .= $this->generateSetUpBeforeClassMethod($testClass);
         }
 
@@ -349,15 +359,33 @@ final class DynamicTestCaseGenerator
     }
 
     /**
-     * Generate the setUpBeforeClass method for BeforeClass methods.
+     * Generate the setUpBeforeClass method for BeforeClass methods and state initialization.
      */
     private function generateSetUpBeforeClassMethod(InlineTestClass $testClass): string
     {
         $originalClass = $testClass->getReflection();
+        $stateInitializer = $testClass->getStateInitializer();
 
         $code = "    public static function setUpBeforeClass(): void\n";
         $code .= "    {\n";
         $code .= "        parent::setUpBeforeClass();\n";
+
+        // Initialize state if there's a state initializer
+        if ($stateInitializer !== null) {
+            if ($stateInitializer instanceof \ReflectionFunction) {
+                $functionName = $stateInitializer->getName();
+                $code .= "        self::\$__state = \\{$functionName}();\n";
+            } else {
+                if ($originalClass === null) {
+                    throw new \RuntimeException('Class reflection is null for class-based State method');
+                }
+                $originalClassName = $originalClass->getName();
+                $methodName = $stateInitializer->getName();
+                $code .= "        \$method = new \\ReflectionMethod('\\{$originalClassName}', '{$methodName}');\n";
+                $code .= "        \$method->setAccessible(true);\n";
+                $code .= "        self::\$__state = \$method->invoke(null);\n";
+            }
+        }
 
         foreach ($testClass->getBeforeClassMethods() as $method) {
             if ($method instanceof \ReflectionFunction) {
