@@ -2,25 +2,25 @@
 
 declare(strict_types=1);
 
-namespace NSRosenqvist\PHPUnitInline\Tests\Integration;
+namespace NSRosenqvist\PHPUnitInline\Tests\E2E;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Integration tests for PHPStan extension.
+ * E2E tests for PHPStan extension.
  *
  * These tests verify that the PHPStan extension works correctly
- * with the e2e test fixtures.
+ * with the e2e runner fixtures.
  */
-final class PHPStanIntegrationTest extends TestCase
+final class PHPStanExtensionTest extends TestCase
 {
     private static string $phpstanConfig;
     private static string $phpstanBin;
 
     public static function setUpBeforeClass(): void
     {
-        self::$phpstanConfig = dirname(__DIR__) . '/e2e/phpstan.neon';
+        self::$phpstanConfig = dirname(__DIR__) . '/Fixtures/runner/phpstan.neon';
         self::$phpstanBin = dirname(__DIR__, 2) . '/vendor/bin/phpstan';
 
         if (!file_exists(self::$phpstanBin)) {

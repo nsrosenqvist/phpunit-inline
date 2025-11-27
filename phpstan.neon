@@ -7,6 +7,6 @@ parameters:
         - src
         - tests
     excludePaths:
-        - tests/e2e
-        - tests/Fixtures/Strip
+        - tests/Fixtures/runner
+        - tests/Fixtures/strip
 

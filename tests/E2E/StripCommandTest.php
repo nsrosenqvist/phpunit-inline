@@ -2,15 +2,14 @@
 
 declare(strict_types=1);
 
-namespace NSRosenqvist\PHPUnitInline\Tests\Integration;
+namespace NSRosenqvist\PHPUnitInline\Tests\E2E;
 
 use PHPUnit\Framework\Attributes\Test;
 use PHPUnit\Framework\Attributes\DataProvider;
-use PHPUnit\Framework\Attributes\Depends;
 use PHPUnit\Framework\TestCase;
 
 /**
- * Integration tests for the phpunit-inline-strip command.
+ * E2E tests for the phpunit-inline-strip command.
  *
  * These tests copy fixtures to a temp directory, run the strip command,
  * and verify the results.
@@ -23,7 +22,7 @@ final class StripCommandTest extends TestCase
 
     public static function setUpBeforeClass(): void
     {
-        self::$fixturesDir = dirname(__DIR__) . '/Fixtures/Strip';
+        self::$fixturesDir = dirname(__DIR__) . '/Fixtures/strip';
         self::$tempDir = sys_get_temp_dir() . '/phpunit-inline-strip-test-' . uniqid();
 
         if (!mkdir(self::$tempDir, 0755, true)) {

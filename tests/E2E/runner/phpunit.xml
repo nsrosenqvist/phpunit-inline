@@ -1,13 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!--
     This phpunit.xml is not used for running E2E tests.
-    E2E tests are run via the CLI: ./bin/phpunit-inline --scan-directories=tests/e2e/src
+    E2E tests are run via the CLI: ./bin/phpunit-inline --scan-directories=tests/e2e/runner/src
 
     This file exists only for IDE support and PHPStan configuration.
 -->
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:noNamespaceSchemaLocation="../../vendor/phpunit/phpunit/phpunit.xsd"
+         xsi:noNamespaceSchemaLocation="../../../vendor/phpunit/phpunit/phpunit.xsd"
          bootstrap="bootstrap.php"
-         cacheDirectory="../../.phpunit.cache/e2e"
+         cacheDirectory="../../../.phpunit.cache/e2e"
          colors="true">
 </phpunit>
