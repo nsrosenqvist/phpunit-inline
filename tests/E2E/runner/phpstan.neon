@@ -6,14 +6,6 @@ parameters:
     paths:
         - src
     ignoreErrors:
-        # Factory methods are called via reflection, not directly
-        -
-            identifier: method.unused
-            path: src/WithFactory.php
-        # Lifecycle methods (Before/After) are called via reflection
-        -
-            identifier: method.unused
-            path: src/WithLifecycle.php
         # Mock objects implement the interface via __call magic
         -
             identifier: assign.propertyType

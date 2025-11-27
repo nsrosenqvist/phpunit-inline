@@ -17,7 +17,7 @@ final class FunctionBasedTestExecutionTest extends TestCase
     public function testFunctionBasedTestsCanExecute(): void
     {
         $scanner = new InlineTestScanner([__DIR__ . '/../Fixtures']);
-        $testClasses = $scanner->scan(__DIR__ . '/../Fixtures/FunctionBasedTests.php');
+        $testClasses = $scanner->scan();
 
         // Find the function-based test class
         $testClass = null;
