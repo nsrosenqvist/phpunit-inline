@@ -3,7 +3,7 @@
 declare(strict_types=1);
 
 // Load the main package's autoloader
-require_once __DIR__ . '/../../vendor/autoload.php';
+require_once __DIR__ . '/../../../vendor/autoload.php';
 
 // Register autoloader for E2E test classes
 spl_autoload_register(function (string $class): void {

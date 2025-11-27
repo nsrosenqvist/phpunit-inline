@@ -33,7 +33,7 @@
     "autoload-dev": {
         "psr-4": {
             "NSRosenqvist\\PHPUnitInline\\Tests\\": "tests/",
-            "E2E\\": "tests/e2e/src/"
+            "E2E\\": "tests/Fixtures/runner/src/"
         }
     },
     "extra": {
@@ -54,7 +54,8 @@
         "test": "phpunit --testdox",
         "test:unit": "phpunit --testdox --testsuite=Unit",
         "test:integration": "phpunit --testdox --testsuite=Integration",
-        "test:e2e": "./bin/phpunit-inline --scan-directories=tests/e2e/src",
+        "test:e2e": "phpunit --testdox --testsuite=E2E",
+        "test:e2e:runner": "./bin/phpunit-inline --scan-directories=tests/Fixtures/runner/src",
         "test:coverage": "phpunit --coverage-html coverage",
         "analyze": "phpstan analyze --memory-limit=256M",
         "analyze:baseline": "phpstan analyze --memory-limit=256M --generate-baseline",
@@ -66,7 +67,7 @@
             "@format:check",
             "@analyze",
             "@test",
-            "@test:e2e"
+            "@test:e2e:runner"
         ]
     }
 }

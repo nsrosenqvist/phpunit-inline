@@ -1,0 +1,37 @@
+includes:
+    - ../../../phpstan-extension.neon
+
+parameters:
+    level: 6
+    paths:
+        - src
+    ignoreErrors:
+        # Factory methods are called via reflection, not directly
+        -
+            identifier: method.unused
+            path: src/WithFactory.php
+        # Lifecycle methods (Before/After) are called via reflection
+        -
+            identifier: method.unused
+            path: src/WithLifecycle.php
+        # Mock objects implement the interface via __call magic
+        -
+            identifier: assign.propertyType
+            path: src/NamespaceBased.php
+        -
+            identifier: method.notFound
+            path: src/NamespaceBased.php
+        -
+            identifier: argument.type
+            path: src/WithMocking.php
+        # Data provider return types - array shape specification is verbose
+        -
+            identifier: missingType.iterableValue
+        # PHPUnit attributes don't officially support function targets, but we make it work
+        -
+            identifier: attribute.target
+            path: src/functions.php
+        -
+            identifier: attribute.target
+            path: src/functionState.php
+
