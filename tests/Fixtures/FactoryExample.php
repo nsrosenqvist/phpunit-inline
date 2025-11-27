@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace NSRosenqvist\PHPUnitInline\Tests\Fixtures;
 
 use PHPUnit\Framework\Attributes\Test;
-use NSRosenqvist\PHPUnitInline\Attributes\Factory;
 use NSRosenqvist\PHPUnitInline\Attributes\DefaultFactory;
+use NSRosenqvist\PHPUnitInline\Attributes\Factory;
 
 /**
  * Example class with constructor arguments that requires factory methods for testing.
@@ -39,14 +39,12 @@ final class FactoryExample
     }
 
     /** @phpstan-ignore method.unused */
-    #[Factory]
     private static function createWithCustomPrefix(): self
     {
         return new self('Custom', 3);
     }
 
     /** @phpstan-ignore method.unused */
-    #[Factory]
     private static function createWithHighMultiplier(): self
     {
         return new self('High', 10);

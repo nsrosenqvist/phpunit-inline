@@ -20,6 +20,7 @@ final class InlineTestClass
      * @param array<ReflectionMethod|ReflectionFunction> $afterMethods
      * @param array<ReflectionMethod|ReflectionFunction> $beforeClassMethods
      * @param array<ReflectionMethod|ReflectionFunction> $afterClassMethods
+     * @param ReflectionMethod|ReflectionFunction|null $stateInitializer The #[State] function/method
      * @param string|null $namespace For function-only tests, the namespace they belong to
      * @param string|null $sourceFile The source file path (for filename-based test naming)
      */
@@ -30,6 +31,7 @@ final class InlineTestClass
         private readonly array $afterMethods = [],
         private readonly array $beforeClassMethods = [],
         private readonly array $afterClassMethods = [],
+        private readonly ReflectionMethod|ReflectionFunction|null $stateInitializer = null,
         private readonly ?string $namespace = null,
         private readonly ?string $sourceFile = null
     ) {
@@ -120,5 +122,13 @@ final class InlineTestClass
     public function getAfterClassMethods(): array
     {
         return $this->afterClassMethods;
+    }
+
+    /**
+     * Get the state initializer function/method (marked with #[State]).
+     */
+    public function getStateInitializer(): ReflectionMethod|ReflectionFunction|null
+    {
+        return $this->stateInitializer;
     }
 }

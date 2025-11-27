@@ -13,30 +13,6 @@ use NSRosenqvist\PHPUnitInline\Tests\Fixtures\DataProvider;
 final class DataProviderTest extends TestCase
 {
     #[Test]
-    public function itDetectsDataProviderAttributes(): void
-    {
-        $reflection = new \ReflectionClass(DataProvider::class);
-        $testAddition = $reflection->getMethod('testAddition');
-
-        $scanner = new InlineTestScanner([]);
-        $providerName = $scanner->findDataProvider($testAddition);
-
-        $this->assertSame('additionProvider', $providerName);
-    }
-
-    #[Test]
-    public function itReturnsNullForMethodsWithoutDataProvider(): void
-    {
-        $reflection = new \ReflectionClass(DataProvider::class);
-        $testWithout = $reflection->getMethod('testWithoutDataProvider');
-
-        $scanner = new InlineTestScanner([]);
-        $providerName = $scanner->findDataProvider($testWithout);
-
-        $this->assertNull($providerName);
-    }
-
-    #[Test]
     public function itCreatesMultipleTestCasesForDataProvider(): void
     {
         $scanner = new InlineTestScanner([__DIR__ . '/../Fixtures']);

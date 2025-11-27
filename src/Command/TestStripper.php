@@ -25,6 +25,7 @@ final class TestStripper
         'AfterClass',
         'Factory',
         'DefaultFactory',
+        'State',
     ];
 
     /** @var array<string> Use statement patterns to remove */
@@ -38,6 +39,7 @@ final class TestStripper
         'PHPUnit\\Framework\\Attributes\\TestDox',
         'NSRosenqvist\\PHPUnitInline\\Attributes\\Factory',
         'NSRosenqvist\\PHPUnitInline\\Attributes\\DefaultFactory',
+        'NSRosenqvist\\PHPUnitInline\\Attributes\\State',
     ];
 
     public function strip(string $content): string
@@ -45,14 +47,17 @@ final class TestStripper
         // First, collect data providers referenced by tests
         $dataProviders = $this->collectDataProviders($content);
 
+        // Collect factories referenced by tests
+        $factories = $this->collectFactories($content);
+
         // Remove entire \Tests sub-namespaces
         $content = $this->removeTestsNamespaces($content);
 
         // Remove test methods/functions and their attributes
         $content = $this->removeTestMethods($content);
 
-        // Remove factory methods
-        $content = $this->removeFactoryMethods($content);
+        // Remove factory methods (both attributed and referenced)
+        $content = $this->removeFactoryMethods($content, $factories);
 
         // Remove data provider methods/functions
         $content = $this->removeDataProviders($content, $dataProviders);
@@ -81,6 +86,23 @@ final class TestStripper
         }
 
         return array_unique($providers);
+    }
+
+    /**
+     * Collect all factory names referenced in the content.
+     *
+     * @return array<string>
+     */
+    private function collectFactories(string $content): array
+    {
+        $factories = [];
+
+        // Match #[Factory('methodName')] or #[Factory("methodName")] on test methods
+        if (preg_match_all('/#\[Factory\([\'"]([^\'"]+)[\'"]\)\]/', $content, $matches)) {
+            $factories = array_merge($factories, $matches[1]);
+        }
+
+        return array_unique($factories);
     }
 
     /**
@@ -228,11 +250,34 @@ final class TestStripper
     }
 
     /**
-     * Remove factory methods.
+     * Remove factory methods (both with attributes and referenced by name).
+     *
+     * @param array<string> $factories Factory method names referenced by #[Factory('name')]
      */
-    private function removeFactoryMethods(string $content): string
+    private function removeFactoryMethods(string $content, array $factories): string
     {
-        // Already handled by removeTestMethods since Factory and DefaultFactory are in TEST_ATTRIBUTES
+        // Methods with #[Factory] or #[DefaultFactory] attributes are already
+        // handled by removeTestMethods since they're in TEST_ATTRIBUTES.
+        // Here we handle factories referenced by name (without attributes).
+        foreach ($factories as $factory) {
+            // Remove method by name
+            $pattern = '/\s*(?:private|protected|public)\s+(?:static\s+)?function\s+' .
+                       preg_quote($factory, '/') . '\s*\([^)]*\)\s*(?::\s*[^{]+)?\s*\{/s';
+
+            if (preg_match($pattern, $content, $matches, \PREG_OFFSET_CAPTURE)) {
+                /** @var array<int, array{0: string, 1: int<-1, max>}> $matches */
+                $startPos = (int) $matches[0][1];
+                $bracePos = strpos($content, '{', $startPos);
+
+                if ($bracePos !== false) {
+                    $endPos = $this->findMatchingBrace($content, $bracePos);
+                    if ($endPos !== false) {
+                        $content = substr($content, 0, $startPos) . substr($content, $endPos + 1);
+                    }
+                }
+            }
+        }
+
         return $content;
     }
 
@@ -306,6 +351,13 @@ final class TestStripper
         // Remove use function statements for test() helper
         $content = preg_replace(
             '/\s*use\s+function\s+test\s*;\s*/',
+            "\n",
+            $content
+        ) ?? $content;
+
+        // Remove use function statements for state() helper
+        $content = preg_replace(
+            '/\s*use\s+function\s+state\s*;\s*/',
             "\n",
             $content
         ) ?? $content;

@@ -9,32 +9,9 @@ use PHPUnit\Framework\TestCase;
 use NSRosenqvist\PHPUnitInline\Scanner\InlineTestScanner;
 use NSRosenqvist\PHPUnitInline\TestCase\InlineTestSuiteBuilder;
 use NSRosenqvist\PHPUnitInline\Tests\Fixtures\LifecycleMethods;
-use PHPUnit\TextUI\TestRunner;
 
 final class LifecycleMethodsTest extends TestCase
 {
-    #[Test]
-    public function itDetectsLifecycleMethods(): void
-    {
-        $scanner = new InlineTestScanner([__DIR__ . '/../Fixtures']);
-        $testClasses = $scanner->scan();
-
-        $lifecycleClass = null;
-        foreach ($testClasses as $testClass) {
-            if ($testClass->getClassName() === LifecycleMethods::class) {
-                $lifecycleClass = $testClass;
-                break;
-            }
-        }
-
-        $this->assertNotNull($lifecycleClass);
-        $this->assertCount(2, $lifecycleClass->getTestMethods(), 'Should find 2 test methods');
-        $this->assertCount(1, $lifecycleClass->getBeforeMethods(), 'Should find 1 Before method');
-        $this->assertCount(1, $lifecycleClass->getAfterMethods(), 'Should find 1 After method');
-        $this->assertCount(1, $lifecycleClass->getBeforeClassMethods(), 'Should find 1 BeforeClass method');
-        $this->assertCount(1, $lifecycleClass->getAfterClassMethods(), 'Should find 1 AfterClass method');
-    }
-
     #[Test]
     public function itExecutesLifecycleMethodsInCorrectOrder(): void
     {

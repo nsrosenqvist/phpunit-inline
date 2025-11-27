@@ -31,4 +31,7 @@ parameters:
         -
             identifier: attribute.target
             path: src/functions.php
+        -
+            identifier: attribute.target
+            path: src/functionState.php
 

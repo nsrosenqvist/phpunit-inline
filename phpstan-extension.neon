@@ -1,8 +1,8 @@
 services:
     -
-        class: NSRosenqvist\PHPUnitInline\PHPStan\InlineTestMethodReflectionExtension
+        class: NSRosenqvist\PHPUnitInline\PHPStan\StateReturnTypeExtension
         tags:
-            - phpstan.broker.methodsClassReflectionExtension
+            - phpstan.dynamicFunctionReturnTypeExtension
 
 parameters:
     reportUnmatchedIgnoredErrors: false
@@ -10,6 +10,10 @@ parameters:
         # Methods with #[Test] attribute are invoked via reflection by the test runner
         -
             message: '#^Method .+::test.+\(\) is unused\.$#'
+            path: '*'
+        # State initializer methods are invoked via reflection by the test runner
+        -
+            message: '#^(Static )?[Mm]ethod .+::(init|setup|create).*(State|state)\(\) is unused\.$#'
             path: '*'
         # Data provider methods are invoked via reflection
         -
@@ -35,10 +39,6 @@ parameters:
         -
             message: '#^Call to an undefined method NSRosenqvist\\PHPUnitInline\\TestCase\\TestProxy::.+\(\)\.$#'
             path: 'tests/*'
-        # Generic type covariance for ReflectionClass - test infrastructure limitation
-        -
-            message: '#^Parameter .+ of static method NSRosenqvist\\PHPUnitInline\\TestCase\\InlineTestCase::createTest\(\) expects ReflectionClass<object>, ReflectionClass<.+> given\.$#'
-            path: 'tests/*'
         # Function-based data providers can return generic arrays
         -
             message: '#^Function .+Provider\(\) return type has no value type specified in iterable type array\.$#'
@@ -49,6 +49,7 @@ parameters:
             paths:
                 - tests/Fixtures/FunctionBasedTests.php
                 - tests/Fixtures/FunctionBasedTestsWithDataProvider.php
+                - tests/Fixtures/StateFunctionBased.php
         -
             message: '#^Attribute class PHPUnit\\Framework\\Attributes\\DataProvider does not have the function target\.$#'
             path: tests/Fixtures/FunctionBasedTestsWithDataProvider.php
@@ -71,7 +72,3 @@ parameters:
         -
             message: '#^Binary operation "\." between non-falsy-string and mixed results in an error\.$#'
             path: tests/Integration/FunctionBasedDataProviderExecutionTest.php
-
-
-
-
