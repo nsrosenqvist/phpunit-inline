@@ -7,6 +7,7 @@ $finder = PhpCsFixer\Finder::create()
     ->in(__DIR__ . '/tests');
 
 return (new PhpCsFixer\Config())
+    ->setParallelConfig(PhpCsFixer\Runner\Parallel\ParallelConfigFactory::detect())
     ->setRules([
         '@PSR12' => true,
         'strict_param' => true,
