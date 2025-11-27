@@ -979,7 +979,6 @@ deploy:
 ## Requirements
 
 - PHP 8.2 or higher
-- PHPUnit 11.0 or 12.0
 
 ## Contributing
 
